@@ -53,7 +53,6 @@
     .safe-bottom-bar {
       padding-bottom: max(var(--sab), 0.75rem);
     }
-    /* カスタムスクロールバー非表示 */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -61,7 +60,6 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-    /* アニメーション */
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -188,8 +186,8 @@
         </svg>
       </div>
       <div>
-        <p class="text-sm font-bold text-slate-800">AIが日時・場所・詳細を解析中...</p>
-        <p class="text-xs text-slate-500 mt-1">「来週の金曜」「明後日」などの相対日時を計算しています</p>
+        <p id="loadingTitle" class="text-sm font-bold text-slate-800">AIが日時・場所・詳細を解析中...</p>
+        <p id="loadingSubtext" class="text-xs text-slate-500 mt-1">「来週の金曜」「明後日」などの相対日時を計算しています</p>
       </div>
     </section>
 
@@ -276,20 +274,24 @@
             </button>
           </div>
           <p class="text-[11px] text-slate-500 leading-relaxed">
-            キーはお使いのブラウザの <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">localStorage</code> にのみ保存され、外部サーバーへは一切送信されません（<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AQ.</code> / <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AIzaSy</code> 両対応）。
+            キーはブラウザの <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">localStorage</code> にのみ保存されます（<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AQ.</code> / <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AIzaSy</code> 両対応）。
           </p>
         </div>
 
         <div class="space-y-1.5">
-          <label for="modelSelect" class="block text-xs font-bold text-slate-700">使用モデル</label>
+          <div class="flex items-center justify-between">
+            <label for="modelSelect" class="block text-xs font-bold text-slate-700">使用モデル（混雑時は自動で別モデルへ切替）</label>
+            <button id="refreshModelsBtn" type="button" class="text-[11px] font-semibold text-brand-600 hover:underline active:scale-95 transition">
+              一覧を取得
+            </button>
+          </div>
           <select
             id="modelSelect"
             class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
           >
-            <option value="gemini-3.8-flash">gemini-3.8-flash（推奨：最新・高速・高精度）</option>
-            <option value="gemini-3.8-flash-lite">gemini-3.8-flash-lite（超高速・軽量）</option>
-            <option value="gemini-3.8-pro">gemini-3.8-pro（複雑な日程表向け）</option>
+            <option value="gemini-3.8-flash">gemini-3.8-flash（初期値）</option>
           </select>
+          <p id="modelFetchStatus" class="text-[11px] text-slate-400">「一覧を取得」を押すとAPIで利用可能な最新モデルを読み込みます。</p>
         </div>
 
         <div class="space-y-1.5">
@@ -297,7 +299,7 @@
           <input
             id="customModelInput"
             type="text"
-            placeholder="例：gemini-3.8-flash（空欄なら上の選択を使用）"
+            placeholder="空欄なら上の選択を使用"
             autocomplete="off"
             class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
           />
@@ -330,16 +332,16 @@
     const STORAGE_KEY_API = 'sc_cal_gemini_api_key';
     const STORAGE_KEY_MODEL = 'sc_cal_gemini_model';
     const STORAGE_KEY_CUSTOM_MODEL = 'sc_cal_gemini_custom_model';
+    const STORAGE_KEY_AVAILABLE_MODELS = 'sc_cal_available_models_v2';
     const DEFAULT_MODEL = 'gemini-3.8-flash';
     const MAX_IMAGE_DIMENSION = 1200;
     const JPEG_QUALITY = 0.82;
     const WEEKDAYS_JP = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
     const WEEKDAYS_SHORT_JP = ['日', '月', '火', '水', '木', '金', '土'];
 
-    // 選択された画像配列: [{ id, dataUrl, base64, mimeType, width, height, sizeKB }]
     let selectedImages = [];
-    // 抽出された予定リスト
     let extractedEvents = [];
+    let availableModels = [];
 
     // DOM要素の参照
     const openSettingsBtn = document.getElementById('openSettingsBtn');
@@ -351,6 +353,8 @@
     const apiKeyInput = document.getElementById('apiKeyInput');
     const toggleApiKeyVisibilityBtn = document.getElementById('toggleApiKeyVisibilityBtn');
     const modelSelect = document.getElementById('modelSelect');
+    const refreshModelsBtn = document.getElementById('refreshModelsBtn');
+    const modelFetchStatus = document.getElementById('modelFetchStatus');
     const customModelInput = document.getElementById('customModelInput');
     const apiKeyStatusDot = document.getElementById('apiKeyStatusDot');
     const apiKeyStatusText = document.getElementById('apiKeyStatusText');
@@ -370,6 +374,8 @@
     const loadDemoBtn = document.getElementById('loadDemoBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const loadingSection = document.getElementById('loadingSection');
+    const loadingTitle = document.getElementById('loadingTitle');
+    const loadingSubtext = document.getElementById('loadingSubtext');
 
     const eventCountBadge = document.getElementById('eventCountBadge');
     const emptyStateBox = document.getElementById('emptyStateBox');
@@ -378,10 +384,14 @@
     const addEmptyCardBtn = document.getElementById('addEmptyCardBtn');
 
     /**************************************************************
-     * ユーティリティ関数（日時フォーマット・計算）
+     * ユーティリティ関数
      **************************************************************/
     function pad2(n) {
       return String(n).padStart(2, '0');
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     function formatDateYYYYMMDD(dateObj, sep = '-') {
@@ -395,7 +405,6 @@
       return `${pad2(dateObj.getHours())}:${pad2(dateObj.getMinutes())}`;
     }
 
-    // 現在日時の表示更新
     function updateClockBanner() {
       const now = new Date();
       const y = now.getFullYear();
@@ -406,7 +415,6 @@
       currentClockDisplay.textContent = `基準: ${y}年${m}月${d}日(${w[0]}) ${hhmm}`;
     }
 
-    // 終了日時が未指定または不正な場合に開始から2時間後を自動計算する
     function ensureValidEndDateTime(startDateStr, startTimeStr, endDateStr, endTimeStr, isAllDay) {
       const todayStr = formatDateYYYYMMDD(new Date());
       const validStartDate = /^\d{4}-\d{2}-\d{2}$/.test(startDateStr) ? startDateStr : todayStr;
@@ -428,7 +436,6 @@
       const [sh, smin] = validStartTime.split(':').map(Number);
       const startObj = new Date(sy, sm - 1, sd, sh, smin, 0);
 
-      // 終了時刻が有効か判定
       if (/^\d{4}-\d{2}-\d{2}$/.test(endDateStr) && /^\d{2}:\d{2}$/.test(endTimeStr)) {
         const [ey, em, ed] = endDateStr.split('-').map(Number);
         const [eh, emin] = endTimeStr.split(':').map(Number);
@@ -443,7 +450,6 @@
         }
       }
 
-      // 開始から2時間後を設定
       const plus2Hours = new Date(startObj.getTime() + 2 * 60 * 60 * 1000);
       return {
         startDate: validStartDate,
@@ -453,7 +459,6 @@
       };
     }
 
-    // トースト表示
     function showToast(message, type = 'info') {
       const container = document.getElementById('toastContainer');
       const toast = document.createElement('div');
@@ -463,7 +468,7 @@
           ? 'bg-emerald-600 text-white'
           : 'bg-slate-800 text-white';
 
-      toast.className = `${bgClass} px-4 py-2.5 rounded-full shadow-lg text-xs font-semibold flex items-center gap-2 animate-fade-in pointer-events-auto`;
+      toast.className = `${bgClass} px-4 py-2.5 rounded-2xl shadow-lg text-xs font-semibold flex items-center gap-2 animate-fade-in pointer-events-auto max-w-md text-center`;
       toast.innerHTML = `<span>${message}</span>`;
       container.appendChild(toast);
 
@@ -471,11 +476,11 @@
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.25s ease';
         setTimeout(() => toast.remove(), 250);
-      }, 3200);
+      }, 3600);
     }
 
     /**************************************************************
-     * 1. APIキー管理とモデル設定 (localStorage)
+     * 1. APIキー管理 & ListModels による利用可能モデル自動取得
      **************************************************************/
     function getApiKey() {
       return (localStorage.getItem(STORAGE_KEY_API) || '').trim();
@@ -487,16 +492,129 @@
 
     function getDropdownModel() {
       const saved = (localStorage.getItem(STORAGE_KEY_MODEL) || '').trim();
-      // 提供終了した2.5系がlocalStorageに残っている場合は自動で最新デフォルトへ移行
-      if (!saved || saved.startsWith('gemini-2.5-')) {
-        localStorage.setItem(STORAGE_KEY_MODEL, DEFAULT_MODEL);
-        return DEFAULT_MODEL;
+      // 非存在・終了モデルが保存されている場合は補正
+      const invalidSaved = ['gemini-2.5-flash', 'gemini-3.8-flash-lite'];
+      if (!saved || invalidSaved.includes(saved)) {
+        const fallback = availableModels[0]?.id || DEFAULT_MODEL;
+        localStorage.setItem(STORAGE_KEY_MODEL, fallback);
+        return fallback;
       }
       return saved;
     }
 
     function getSelectedModel() {
       return getCustomModel() || getDropdownModel();
+    }
+
+    function loadCachedModels() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(STORAGE_KEY_AVAILABLE_MODELS) || '[]');
+        if (Array.isArray(cached) && cached.length > 0) {
+          availableModels = cached;
+        }
+      } catch (e) {
+        availableModels = [];
+      }
+      renderModelSelectOptions();
+    }
+
+    function renderModelSelectOptions(preferredModel = null) {
+      const current = preferredModel || getDropdownModel();
+      const list = availableModels.length > 0
+        ? availableModels
+        : [{ id: DEFAULT_MODEL, displayName: `${DEFAULT_MODEL}（初期値）` }];
+
+      modelSelect.innerHTML = '';
+      let matched = false;
+
+      list.forEach((m) => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.displayName && m.displayName !== m.id
+          ? `${m.id}（${m.displayName}）`
+          : m.id;
+        if (m.id === current) {
+          opt.selected = true;
+          matched = true;
+        }
+        modelSelect.appendChild(opt);
+      });
+
+      if (!matched && list.length > 0) {
+        modelSelect.value = list[0].id;
+        localStorage.setItem(STORAGE_KEY_MODEL, list[0].id);
+      }
+    }
+
+    // ListModels API から実際に利用可能なGeminiモデル一覧を取得
+    async function fetchAvailableModels(apiKey, silent = false) {
+      const key = (apiKey || getApiKey()).trim();
+      if (!key) {
+        if (!silent) modelFetchStatus.textContent = '先にAPIキーを入力してから「一覧を取得」を押してください。';
+        return [];
+      }
+
+      if (!silent) {
+        refreshModelsBtn.disabled = true;
+        modelFetchStatus.textContent = '利用可能なモデル一覧を取得中...';
+      }
+
+      try {
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', {
+          method: 'GET',
+          headers: { 'x-goog-api-key': key }
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const rawList = Array.isArray(data.models) ? data.models : [];
+
+        const filtered = rawList
+          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+          .map(m => ({
+            id: String(m.name || '').replace(/^models\//, ''),
+            displayName: m.displayName || ''
+          }))
+          .filter(m => /^gemini-/i.test(m.id) && !/(embedding|tts|image|audio|robotics|computer-use|deep-research|live|2\.5-flash$)/i.test(m.id));
+
+        // 使いやすいFlash系・最新モデルを上位に並べる
+        const scoreModel = (id) => {
+          let s = 0;
+          if (/flash/i.test(id)) s += 30;
+          if (/lite/i.test(id)) s += 10;
+          if (/pro/i.test(id)) s += 15;
+          if (/latest/i.test(id)) s += 8;
+          if (/preview|exp/i.test(id)) s -= 2;
+          if (/^gemini-1\.|^gemini-2\.0/i.test(id)) s -= 20;
+          return s;
+        };
+
+        filtered.sort((a, b) => scoreModel(b.id) - scoreModel(a.id) || b.id.localeCompare(a.id));
+
+        if (filtered.length > 0) {
+          availableModels = filtered;
+          localStorage.setItem(STORAGE_KEY_AVAILABLE_MODELS, JSON.stringify(filtered));
+          renderModelSelectOptions();
+          if (!silent) {
+            modelFetchStatus.textContent = `利用可能な ${filtered.length} 個のモデルを取得しました。`;
+          }
+          return filtered;
+        } else {
+          if (!silent) modelFetchStatus.textContent = '対象モデルが見つかりませんでした。';
+          return [];
+        }
+      } catch (err) {
+        console.warn('ListModels failed:', err);
+        if (!silent) {
+          modelFetchStatus.textContent = `モデル一覧の取得に失敗しました (${err.message})。`;
+        }
+        return [];
+      } finally {
+        refreshModelsBtn.disabled = false;
+      }
     }
 
     function updateApiKeyStatusUI() {
@@ -512,10 +630,15 @@
 
     function openSettingsModal() {
       apiKeyInput.value = getApiKey();
-      modelSelect.value = getDropdownModel();
       customModelInput.value = getCustomModel();
+      renderModelSelectOptions();
       settingsModal.classList.remove('hidden');
       settingsModal.classList.add('flex');
+
+      // APIキーがあり一覧未取得なら自動で取得
+      if (getApiKey() && availableModels.length === 0) {
+        fetchAvailableModels(getApiKey(), false);
+      }
     }
 
     function closeSettingsModal() {
@@ -526,12 +649,15 @@
     openSettingsBtn.addEventListener('click', openSettingsModal);
     closeSettingsBtn.addEventListener('click', closeSettingsModal);
     cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+    refreshModelsBtn.addEventListener('click', () => {
+      fetchAvailableModels(apiKeyInput.value.trim() || getApiKey(), false);
+    });
 
     toggleApiKeyVisibilityBtn.addEventListener('click', () => {
       apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
     });
 
-    saveSettingsBtn.addEventListener('click', () => {
+    saveSettingsBtn.addEventListener('click', async () => {
       const key = apiKeyInput.value.trim();
       const model = modelSelect.value;
       const customModel = customModelInput.value.trim();
@@ -552,6 +678,10 @@
       updateApiKeyStatusUI();
       closeSettingsModal();
       showToast('API設定を保存しました', 'success');
+
+      if (key && availableModels.length === 0) {
+        fetchAvailableModels(key, true);
+      }
     });
 
     clearApiKeyBtn.addEventListener('click', () => {
@@ -573,7 +703,6 @@
             let width = img.width;
             let height = img.height;
 
-            // 長辺が1200pxを超える場合はアスペクト比を維持して縮小
             if (width > height && width > MAX_IMAGE_DIMENSION) {
               height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
               width = MAX_IMAGE_DIMENSION;
@@ -586,7 +715,6 @@
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
-            // 透過PNG対策で白背景を敷く
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
@@ -665,7 +793,6 @@
       });
     }
 
-    // カメラロール選択イベント
     selectImageBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => {
       if (e.target.files.length > 0) {
@@ -679,7 +806,6 @@
       renderImagePreviews();
     });
 
-    // ドラッグ＆ドロップ対応
     dropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       dropZone.classList.add('border-brand-500', 'bg-brand-50/50');
@@ -695,7 +821,6 @@
       }
     });
 
-    // ページ全体でのペーストイベント (Ctrl+V / Cmd+V / スマホ貼付)
     window.addEventListener('paste', (e) => {
       if (!e.clipboardData) return;
       const items = Array.from(e.clipboardData.items);
@@ -707,7 +832,6 @@
       }
     });
 
-    // 「画像をペースト」ボタン (Clipboard API)
     pasteClipboardBtn.addEventListener('click', async () => {
       if (!navigator.clipboard || !navigator.clipboard.read) {
         showToast('画面長押しまたはCtrl+Vで貼り付けてください', 'info');
@@ -750,7 +874,7 @@
     });
 
     /**************************************************************
-     * 3. 相対日時の正確な推論 & Gemini API (Structured Outputs)
+     * 3. 相対日時の推論 & Gemini API (自動リトライ・別モデル自動切替)
      **************************************************************/
     function buildRelativeDateReferencePrompt() {
       const now = new Date();
@@ -760,7 +884,6 @@
       const weekday = WEEKDAYS_JP[now.getDay()];
       const timeStr = formatTimeHHMM(now);
 
-      // 直近21日間のカレンダー対照表を動的生成（「来週の金曜」「今度の土日」等のズレを完全防止）
       const upcomingDaysLines = [];
       for (let i = 0; i <= 21; i++) {
         const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
@@ -788,7 +911,6 @@ ${upcomingDaysLines.join('\n')}
 5. メモ（description）には同伴者、持ち物、予約番号、会費、集合場所、候補日のステータスなどの要点を簡潔にまとめてください。`;
     }
 
-    // Structured Outputs 用 JSONスキーマ
     const SCHEDULE_RESPONSE_SCHEMA = {
       type: 'OBJECT',
       properties: {
@@ -798,42 +920,15 @@ ${upcomingDaysLines.join('\n')}
           items: {
             type: 'OBJECT',
             properties: {
-              title: {
-                type: 'STRING',
-                description: '予定のタイトル（例：〇〇さんと焼肉、ANA065 羽田→新千歳、プロジェクト定例MTG）'
-              },
-              startDate: {
-                type: 'STRING',
-                description: '開始日（YYYY-MM-DD形式）'
-              },
-              startTime: {
-                type: 'STRING',
-                description: '開始時刻（HH:MM 24時間表記。終日の場合は空文字）'
-              },
-              endDate: {
-                type: 'STRING',
-                description: '終了日（YYYY-MM-DD形式）'
-              },
-              endTime: {
-                type: 'STRING',
-                description: '終了時刻（HH:MM 24時間表記。不明な場合は開始時刻の2時間後。終日の場合は空文字）'
-              },
-              isAllDay: {
-                type: 'BOOLEAN',
-                description: '終日イベントかどうか'
-              },
-              location: {
-                type: 'STRING',
-                description: '場所（店名、住所、駅名、オンライン会議室など。不明な場合は空文字）'
-              },
-              url: {
-                type: 'STRING',
-                description: '関連URL（お店の食べログURL、Zoomリンク、予約サイトURLなど。不明な場合は空文字）'
-              },
-              description: {
-                type: 'STRING',
-                description: 'メモ詳細（同伴者、予約番号、持ち物、料金、補足情報の要約）'
-              }
+              title: { type: 'STRING', description: '予定のタイトル' },
+              startDate: { type: 'STRING', description: '開始日（YYYY-MM-DD形式）' },
+              startTime: { type: 'STRING', description: '開始時刻（HH:MM 24時間表記。終日の場合は空文字）' },
+              endDate: { type: 'STRING', description: '終了日（YYYY-MM-DD形式）' },
+              endTime: { type: 'STRING', description: '終了時刻（HH:MM 24時間表記。不明な場合は開始時刻の2時間後。終日の場合は空文字）' },
+              isAllDay: { type: 'BOOLEAN', description: '終日イベントかどうか' },
+              location: { type: 'STRING', description: '場所（店名、住所、駅名など。不明な場合は空文字）' },
+              url: { type: 'STRING', description: '関連URL（不明な場合は空文字）' },
+              description: { type: 'STRING', description: 'メモ詳細（同伴者、予約番号、持ち物、料金、補足情報の要約）' }
             },
             required: ['title', 'startDate', 'startTime', 'endDate', 'endTime', 'isAllDay', 'location', 'url', 'description']
           }
@@ -842,33 +937,102 @@ ${upcomingDaysLines.join('\n')}
       required: ['events']
     };
 
-    // x-goog-api-key ヘッダー送信（AQ.キーがVertex AI Express Mode向けの場合の自動フォールバック付き）
-    async function requestGeminiApi(model, apiKey, payload) {
+    async function callSingleModelOnce(model, apiKey, payload) {
       const encodedModel = encodeURIComponent(model);
-      const headers = {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      };
-
-      const devEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent`;
-      let response = await fetch(devEndpoint, {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent`;
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify(payload)
       });
 
-      // AQ. キーで Gemini Developer API 側が認証拒否した場合は Vertex AI エンドポイントへ自動フォールバック
-      if (!response.ok && apiKey.startsWith('AQ.') && [400, 401, 403].includes(response.status)) {
-        const vertexEndpoint = `https://aiplatform.googleapis.com/v1/publishers/google/models/${encodedModel}:generateContent`;
-        const fallbackResponse = await fetch(vertexEndpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload)
-        });
-        return fallbackResponse;
+      let bodyJson = null;
+      try {
+        bodyJson = await response.json();
+      } catch (_) {}
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        bodyJson,
+        errorMessage: bodyJson?.error?.message || `APIエラー (HTTP ${response.status})`
+      };
+    }
+
+    function isOverloadError(status, msg) {
+      return status === 503 || status === 429 || /high demand|overloaded|try again|rate limit|quota/i.test(msg || '');
+    }
+
+    function isModelMissingError(status, msg) {
+      return status === 404 || /not found|no longer available|not supported|deprecated/i.test(msg || '');
+    }
+
+    // 選択モデルで実行 → 混雑時はリトライ → それでもダメなら ListModels から別モデルへ自動切替
+    async function requestGeminiWithFallback(primaryModel, apiKey, payload) {
+      let lastError = '';
+      let primaryMissing = false;
+
+      // 1) 選択モデルで実行（混雑時は最大2回リトライ）
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt === 0) {
+          loadingTitle.textContent = 'AIが日時・場所・詳細を解析中...';
+          loadingSubtext.textContent = `モデル: ${primaryModel}`;
+        } else {
+          const waitSec = attempt * 2;
+          loadingTitle.textContent = `サーバー混雑のため自動再試行中 (${attempt}/2)...`;
+          loadingSubtext.textContent = `${waitSec}秒後に ${primaryModel} へ再接続します`;
+          await sleep(waitSec * 1000);
+        }
+
+        const res = await callSingleModelOnce(primaryModel, apiKey, payload);
+        if (res.ok) {
+          return { bodyJson: res.bodyJson, usedModel: primaryModel, switched: false };
+        }
+
+        lastError = res.errorMessage;
+        if (isModelMissingError(res.status, res.errorMessage)) {
+          primaryMissing = true;
+          break;
+        }
+        if (!isOverloadError(res.status, res.errorMessage)) {
+          // 認証エラー等は即座に終了
+          throw new Error(lastError);
+        }
       }
 
-      return response;
+      // 2) ListModels で現在利用可能な別モデルを取得して自動フォールバック
+      loadingTitle.textContent = '利用可能な別モデルを検索中...';
+      loadingSubtext.textContent = '混雑や非対応を回避して自動切替を試みます';
+
+      const liveModels = availableModels.length > 0
+        ? availableModels
+        : await fetchAvailableModels(apiKey, true);
+
+      const candidates = liveModels
+        .map(m => m.id)
+        .filter(id => id !== primaryModel)
+        .slice(0, 6);
+
+      for (const altModel of candidates) {
+        loadingTitle.textContent = '別モデルへ自動切替して解析中...';
+        loadingSubtext.textContent = `試行中: ${altModel}`;
+
+        const res = await callSingleModelOnce(altModel, apiKey, payload);
+        if (res.ok) {
+          // 元のモデルが存在しなかった場合は、成功したモデルを次回用に自動保存
+          if (primaryMissing) {
+            localStorage.setItem(STORAGE_KEY_MODEL, altModel);
+            renderModelSelectOptions(altModel);
+          }
+          return { bodyJson: res.bodyJson, usedModel: altModel, switched: true };
+        }
+        lastError = `${altModel}: ${res.errorMessage}`;
+      }
+
+      throw new Error(lastError || '利用可能なすべてのモデルで抽出に失敗しました。少し時間を置いてお試しください。');
     }
 
     async function analyzeScheduleWithGemini() {
@@ -892,7 +1056,6 @@ ${upcomingDaysLines.join('\n')}
       try {
         const userParts = [];
 
-        // 画像パーツの追加
         selectedImages.forEach((img) => {
           userParts.push({
             inlineData: {
@@ -902,7 +1065,6 @@ ${upcomingDaysLines.join('\n')}
           });
         });
 
-        // テキストパーツの追加
         const promptText = rawText
           ? `以下の画像およびテキストから予定を抽出してください。\n\n【入力テキスト / 補足指示】\n${rawText}`
           : '添付されたスクリーンショット画像から予定をすべて抽出してください。';
@@ -925,15 +1087,8 @@ ${upcomingDaysLines.join('\n')}
           }
         };
 
-        const response = await requestGeminiApi(model, apiKey, payload);
+        const { bodyJson: resultJson, usedModel, switched } = await requestGeminiWithFallback(model, apiKey, payload);
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          const errMsg = errData?.error?.message || `APIエラー (HTTP ${response.status})`;
-          throw new Error(errMsg);
-        }
-
-        const resultJson = await response.json();
         const textOutput = resultJson?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!textOutput) {
           throw new Error('AIから有効な応答が得られませんでした');
@@ -970,7 +1125,8 @@ ${upcomingDaysLines.join('\n')}
 
           extractedEvents = [...normalizedEvents, ...extractedEvents];
           renderEventCards();
-          showToast(`${normalizedEvents.length}件の予定を抽出しました！`, 'success');
+          const suffix = switched ? `（${usedModel} へ自動切替）` : '';
+          showToast(`${normalizedEvents.length}件の予定を抽出しました！${suffix}`, 'success');
           document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       } catch (err) {
@@ -1015,7 +1171,6 @@ ${upcomingDaysLines.join('\n')}
         const endWeekday = getWeekdayLabelFromDateStr(ev.endDate);
 
         card.innerHTML = `
-          <!-- カード上部バー -->
           <div class="bg-slate-50/80 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="px-2 py-0.5 rounded-md bg-brand-600 text-white text-[10px] font-bold">予定 #${idx + 1}</span>
@@ -1034,9 +1189,7 @@ ${upcomingDaysLines.join('\n')}
             </div>
           </div>
 
-          <!-- 編集フォーム本体 -->
           <div class="p-4 space-y-3">
-            <!-- タイトル -->
             <div>
               <label class="block text-[11px] font-bold text-slate-500 mb-1">タイトル</label>
               <input
@@ -1048,7 +1201,6 @@ ${upcomingDaysLines.join('\n')}
               />
             </div>
 
-            <!-- 開始日時・終了日時 -->
             <div class="grid grid-cols-2 gap-2.5">
               <div class="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 space-y-1.5">
                 <div class="flex items-center justify-between">
@@ -1091,7 +1243,6 @@ ${upcomingDaysLines.join('\n')}
               </div>
             </div>
 
-            <!-- 場所 & URL -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <div class="flex items-center justify-between mb-1">
@@ -1119,7 +1270,6 @@ ${upcomingDaysLines.join('\n')}
               </div>
             </div>
 
-            <!-- メモ詳細 -->
             <div>
               <label class="block text-[11px] font-bold text-slate-500 mb-1">メモ（同伴者・持ち物・予約番号など）</label>
               <textarea
@@ -1130,7 +1280,6 @@ ${upcomingDaysLines.join('\n')}
               >${escapeHtml(ev.description)}</textarea>
             </div>
 
-            <!-- ワンタップ・カレンダー登録ボタン（2方式） -->
             <div class="pt-1 grid grid-cols-2 gap-2.5">
               <button
                 type="button"
@@ -1155,7 +1304,6 @@ ${upcomingDaysLines.join('\n')}
           </div>
         `;
 
-        // 入力変更のリアルタイム同期
         card.querySelectorAll('[data-field]').forEach((inputEl) => {
           inputEl.addEventListener('change', (e) => {
             const field = e.target.getAttribute('data-field');
@@ -1173,7 +1321,6 @@ ${upcomingDaysLines.join('\n')}
 
             ev[field] = e.target.value;
 
-            // 開始日時変更時、終了日時が逆転していたら自動補正
             if (field === 'startDate' || field === 'startTime') {
               const fixed = ensureValidEndDateTime(ev.startDate, ev.startTime, ev.endDate, ev.endTime, ev.isAllDay);
               ev.endDate = fixed.endDate;
@@ -1189,25 +1336,21 @@ ${upcomingDaysLines.join('\n')}
           });
         });
 
-        // 地図で確認ボタン
         card.querySelector('.open-map-btn').addEventListener('click', () => {
           if (!ev.location.trim()) return;
           const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location.trim())}`;
           window.open(mapUrl, '_blank', 'noopener,noreferrer');
         });
 
-        // 削除ボタン
         card.querySelector('.delete-card-btn').addEventListener('click', () => {
           extractedEvents = extractedEvents.filter(item => item.id !== ev.id);
           renderEventCards();
         });
 
-        // Googleカレンダー登録ボタン
         card.querySelector('.google-cal-btn').addEventListener('click', () => {
           openGoogleCalendarUrl(ev);
         });
 
-        // iPhone / 標準カレンダー (.ics) ボタン
         card.querySelector('.apple-ics-btn').addEventListener('click', () => {
           downloadIcsFile([ev], `${ev.title || 'schedule'}.ics`);
         });
@@ -1219,7 +1362,6 @@ ${upcomingDaysLines.join('\n')}
     /**************************************************************
      * 5. カレンダー登録処理（GoogleカレンダーURL / .ics動的生成）
      **************************************************************/
-    // YYYY-MM-DD の翌日の YYYYMMDD を返す（終日イベントのDTEND排他仕様対応）
     function getNextDayCompact(dateStr) {
       const [y, m, d] = dateStr.split('-').map(Number);
       const next = new Date(y, m - 1, d + 1);
@@ -1232,7 +1374,6 @@ ${upcomingDaysLines.join('\n')}
       return `${cleanDate}T${cleanTime}`;
     }
 
-    // Googleカレンダー追加 (新規タブ起動)
     function openGoogleCalendarUrl(ev) {
       const fixed = ensureValidEndDateTime(ev.startDate, ev.startTime, ev.endDate, ev.endTime, ev.isAllDay);
       let datesParam = '';
@@ -1268,7 +1409,6 @@ ${upcomingDaysLines.join('\n')}
       window.open(url, '_blank', 'noopener,noreferrer');
     }
 
-    // iCalendar (.ics) 文字列のエスケープ処理
     function escapeIcsText(str) {
       return String(str ?? '')
         .replace(/\\/g, '\\\\')
@@ -1343,13 +1483,11 @@ ${upcomingDaysLines.join('\n')}
       showToast('.icsファイルを生成しました', 'success');
     }
 
-    // 全件まとめて.ics保存
     downloadAllIcsBtn.addEventListener('click', () => {
       if (extractedEvents.length === 0) return;
       downloadIcsFile(extractedEvents, 'schedules_all.ics');
     });
 
-    // 手動で空カードを追加
     addEmptyCardBtn.addEventListener('click', () => {
       const now = new Date();
       const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -1369,10 +1507,8 @@ ${upcomingDaysLines.join('\n')}
       renderEventCards();
     });
 
-    // サンプルデータで即座にUIとカレンダー登録を試せるボタン
     loadDemoBtn.addEventListener('click', () => {
       const now = new Date();
-      // 次の金曜と日曜を計算
       const daysUntilFri = (5 - now.getDay() + 7) % 7 || 7;
       const nextFri = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilFri);
       const nextSun = new Date(nextFri.getFullYear(), nextFri.getMonth(), nextFri.getDate() + 2);
@@ -1417,11 +1553,14 @@ ${upcomingDaysLines.join('\n')}
     /**************************************************************
      * 初期化処理
      **************************************************************/
-    getDropdownModel(); // 古い2.5系が保存されていれば自動更新
+    loadCachedModels();
     updateClockBanner();
     setInterval(updateClockBanner, 30000);
     updateApiKeyStatusUI();
     renderEventCards();
+    if (getApiKey()) {
+      fetchAvailableModels(getApiKey(), true);
+    }
   </script>
 </body>
 </html>
