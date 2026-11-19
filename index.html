@@ -264,7 +264,7 @@
             <input
               id="apiKeyInput"
               type="password"
-              placeholder="AIzaSy..."
+              placeholder="AQ.... または AIzaSy..."
               autocomplete="off"
               class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-10 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
             />
@@ -276,7 +276,7 @@
             </button>
           </div>
           <p class="text-[11px] text-slate-500 leading-relaxed">
-            キーはお使いのブラウザの <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">localStorage</code> にのみ保存され、外部サーバーへは一切送信されません（Google AI Studioで取得可能）。
+            キーはお使いのブラウザの <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">localStorage</code> にのみ保存され、外部サーバーへは一切送信されません（<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AQ.</code> / <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AIzaSy</code> 両対応）。
           </p>
         </div>
 
@@ -804,6 +804,38 @@ ${upcomingDaysLines.join('\n')}
       required: ['events']
     };
 
+    // x-goog-api-key ヘッダー送信（AQ.キーがVertex AI Express Mode向けの場合の自動フォールバック付き）
+    async function requestGeminiApi(model, apiKey, payload) {
+      const encodedModel = encodeURIComponent(model);
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      };
+
+      const devEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent`;
+      let response = await fetch(devEndpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      // AQ. キーで Gemini Developer API 側が認証拒否した場合は Vertex AI エンドポイントへ自動フォールバック
+      if (!response.ok && apiKey.startsWith('AQ.') && [400, 401, 403].includes(response.status)) {
+        const vertexEndpoint = `https://aiplatform.googleapis.com/v1/publishers/google/models/${encodedModel}:generateContent`;
+        const fallbackResponse = await fetch(vertexEndpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+        if (fallbackResponse.ok) {
+          return fallbackResponse;
+        }
+        return fallbackResponse;
+      }
+
+      return response;
+    }
+
     async function analyzeScheduleWithGemini() {
       const apiKey = getApiKey();
       if (!apiKey) {
@@ -841,8 +873,6 @@ ${upcomingDaysLines.join('\n')}
           : '添付されたスクリーンショット画像から予定をすべて抽出してください。';
         userParts.push({ text: promptText });
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
         const payload = {
           systemInstruction: {
             parts: [{ text: buildRelativeDateReferencePrompt() }]
@@ -860,11 +890,7 @@ ${upcomingDaysLines.join('\n')}
           }
         };
 
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const response = await requestGeminiApi(model, apiKey, payload);
 
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
