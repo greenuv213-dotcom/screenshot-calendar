@@ -286,10 +286,21 @@
             id="modelSelect"
             class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
           >
-            <option value="gemini-2.5-flash">gemini-2.5-flash（推奨：高速・高精度・低コスト）</option>
-            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite（超高速・軽量）</option>
-            <option value="gemini-2.5-pro">gemini-2.5-pro（複雑な日程表向け）</option>
+            <option value="gemini-3.8-flash">gemini-3.8-flash（推奨：最新・高速・高精度）</option>
+            <option value="gemini-3.8-flash-lite">gemini-3.8-flash-lite（超高速・軽量）</option>
+            <option value="gemini-3.8-pro">gemini-3.8-pro（複雑な日程表向け）</option>
           </select>
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="customModelInput" class="block text-xs font-bold text-slate-700">カスタムモデル名（任意・通常は空欄）</label>
+          <input
+            id="customModelInput"
+            type="text"
+            placeholder="例：gemini-3.8-flash（空欄なら上の選択を使用）"
+            autocomplete="off"
+            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
+          />
         </div>
       </div>
 
@@ -318,6 +329,8 @@
      **************************************************************/
     const STORAGE_KEY_API = 'sc_cal_gemini_api_key';
     const STORAGE_KEY_MODEL = 'sc_cal_gemini_model';
+    const STORAGE_KEY_CUSTOM_MODEL = 'sc_cal_gemini_custom_model';
+    const DEFAULT_MODEL = 'gemini-3.8-flash';
     const MAX_IMAGE_DIMENSION = 1200;
     const JPEG_QUALITY = 0.82;
     const WEEKDAYS_JP = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
@@ -338,6 +351,7 @@
     const apiKeyInput = document.getElementById('apiKeyInput');
     const toggleApiKeyVisibilityBtn = document.getElementById('toggleApiKeyVisibilityBtn');
     const modelSelect = document.getElementById('modelSelect');
+    const customModelInput = document.getElementById('customModelInput');
     const apiKeyStatusDot = document.getElementById('apiKeyStatusDot');
     const apiKeyStatusText = document.getElementById('apiKeyStatusText');
     const currentClockDisplay = document.getElementById('currentClockDisplay');
@@ -457,7 +471,7 @@
         toast.style.opacity = '0';
         toast.style.transition = 'opacity 0.25s ease';
         setTimeout(() => toast.remove(), 250);
-      }, 2800);
+      }, 3200);
     }
 
     /**************************************************************
@@ -467,8 +481,22 @@
       return (localStorage.getItem(STORAGE_KEY_API) || '').trim();
     }
 
+    function getCustomModel() {
+      return (localStorage.getItem(STORAGE_KEY_CUSTOM_MODEL) || '').trim();
+    }
+
+    function getDropdownModel() {
+      const saved = (localStorage.getItem(STORAGE_KEY_MODEL) || '').trim();
+      // 提供終了した2.5系がlocalStorageに残っている場合は自動で最新デフォルトへ移行
+      if (!saved || saved.startsWith('gemini-2.5-')) {
+        localStorage.setItem(STORAGE_KEY_MODEL, DEFAULT_MODEL);
+        return DEFAULT_MODEL;
+      }
+      return saved;
+    }
+
     function getSelectedModel() {
-      return localStorage.getItem(STORAGE_KEY_MODEL) || 'gemini-2.5-flash';
+      return getCustomModel() || getDropdownModel();
     }
 
     function updateApiKeyStatusUI() {
@@ -484,7 +512,8 @@
 
     function openSettingsModal() {
       apiKeyInput.value = getApiKey();
-      modelSelect.value = getSelectedModel();
+      modelSelect.value = getDropdownModel();
+      customModelInput.value = getCustomModel();
       settingsModal.classList.remove('hidden');
       settingsModal.classList.add('flex');
     }
@@ -505,12 +534,21 @@
     saveSettingsBtn.addEventListener('click', () => {
       const key = apiKeyInput.value.trim();
       const model = modelSelect.value;
+      const customModel = customModelInput.value.trim();
+
       if (key) {
         localStorage.setItem(STORAGE_KEY_API, key);
       } else {
         localStorage.removeItem(STORAGE_KEY_API);
       }
       localStorage.setItem(STORAGE_KEY_MODEL, model);
+
+      if (customModel) {
+        localStorage.setItem(STORAGE_KEY_CUSTOM_MODEL, customModel);
+      } else {
+        localStorage.removeItem(STORAGE_KEY_CUSTOM_MODEL);
+      }
+
       updateApiKeyStatusUI();
       closeSettingsModal();
       showToast('API設定を保存しました', 'success');
@@ -827,9 +865,6 @@ ${upcomingDaysLines.join('\n')}
           headers,
           body: JSON.stringify(payload)
         });
-        if (fallbackResponse.ok) {
-          return fallbackResponse;
-        }
         return fallbackResponse;
       }
 
@@ -1382,6 +1417,7 @@ ${upcomingDaysLines.join('\n')}
     /**************************************************************
      * 初期化処理
      **************************************************************/
+    getDropdownModel(); // 古い2.5系が保存されていれば自動更新
     updateClockBanner();
     setInterval(updateClockBanner, 30000);
     updateApiKeyStatusUI();
