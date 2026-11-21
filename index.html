@@ -3,11 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>角が立たないLINE・Slack代筆メーカー</title>
+
+  <!-- PWA / iOSホーム画面追加用メタタグ -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="スクショ暦" />
-  <meta name="theme-color" content="#4f46e5" />
-  <title>スクショdeカレンダー直行便</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="角なし代筆" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#f8fafc" />
+  <meta name="description" content="LINEやSlackのスクショからAIっぽさを消した自然な返信案を4パターン生成" />
+
+  <!-- インラインSVGアイコン -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%230f766e'/%3E%3Cpath d='M30 46c0-10 9-18 20-18h28c11 0 20 8 20 18v22c0 10-9 18-20 18H56l-18 14v-14c-5-3-8-10-8-18V46z' fill='%23ffffff'/%3E%3Ccircle cx='50' cy='57' r='4.5' fill='%230f766e'/%3E%3Ccircle cx='64' cy='57' r='4.5' fill='%230f766e'/%3E%3Ccircle cx='78' cy='57' r='4.5' fill='%230f766e'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%230f766e'/%3E%3Cpath d='M42 64c0-14 13-25 28-25h40c15 0 28 11 28 25v32c0 14-13 25-28 25H78l-24 20v-20c-7-4-12-13-12-25V64z' fill='%23ffffff'/%3E%3Ccircle cx='70' cy='80' r='6.5' fill='%230f766e'/%3E%3Ccircle cx='90' cy='80' r='6.5' fill='%230f766e'/%3E%3Ccircle cx='110' cy='80' r='6.5' fill='%230f766e'/%3E%3C/svg%3E" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,44 +23,53 @@
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', '"Hiragino Sans"', '"Hiragino Kaku Gothic ProN"', '"Noto Sans JP"', 'Meiryo', 'sans-serif'],
-          },
           colors: {
             brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-            }
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+            },
+            linebg: '#eef3f7',
+            linebubble: '#dcfce7',
+            linebubbleborder: '#bbf7d0',
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Hiragino Sans"', '"Hiragino Kaku Gothic ProN"', '"Noto Sans JP"', 'sans-serif'],
           }
         }
       }
-    }
+    };
   </script>
 
   <style>
-    /* PWA Safe Area 対応 */
     :root {
       --sat: env(safe-area-inset-top, 0px);
       --sab: env(safe-area-inset-bottom, 0px);
       --sal: env(safe-area-inset-left, 0px);
       --sar: env(safe-area-inset-right, 0px);
     }
-    body {
-      padding-left: var(--sal);
-      padding-right: var(--sar);
-      padding-bottom: calc(var(--sab) + 5.5rem);
+
+    html, body {
       -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
       background-color: #f8fafc;
     }
-    .safe-top-header {
-      padding-top: max(var(--sat), 0.75rem);
+
+    .safe-top {
+      padding-top: calc(0.75rem + var(--sat));
     }
-    .safe-bottom-bar {
-      padding-bottom: max(var(--sab), 0.75rem);
+
+    .safe-bottom {
+      padding-bottom: calc(1rem + var(--sab));
     }
+
+    .safe-modal-bottom {
+      padding-bottom: calc(1.5rem + var(--sab));
+    }
+
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -60,1507 +77,1992 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
+
+    /* LINE風の右吹き出しテール */
+    .chat-bubble {
+      position: relative;
+      border-radius: 16px 16px 4px 16px;
     }
-    .animate-fade-in {
-      animation: fadeIn 0.25s ease-out forwards;
+
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-fade-up {
+      animation: fadeSlideUp 0.25s ease-out forwards;
     }
   </style>
 </head>
-<body class="text-slate-800 antialiased selection:bg-brand-100 selection:text-brand-700 min-h-screen flex flex-col">
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
 
-  <!-- トップヘッダー (Sticky + Safe Area対応) -->
-  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 safe-top-header px-4 pb-3 transition-all">
-    <div class="max-w-lg mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-700 flex items-center justify-center text-white shadow-sm shadow-brand-500/30">
+  <!-- 固定ヘッダー -->
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80 safe-top pb-3 px-4">
+    <div class="max-w-lg mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-brand-700 text-white flex items-center justify-center shrink-0 shadow-sm">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         </div>
-        <div>
-          <h1 class="text-base font-bold tracking-tight text-slate-900 leading-tight">スクショdeカレンダー直行便</h1>
-          <p id="currentClockDisplay" class="text-[11px] text-slate-500 font-medium">基準日時を取得中...</p>
+        <div class="min-w-0">
+          <h1 class="text-[15px] font-bold text-slate-900 tracking-tight truncate">角が立たない代筆メーカー</h1>
+          <p class="text-[11px] text-slate-500 truncate">LINE・Slackのスクショから自然な返信案を作成</p>
         </div>
       </div>
 
-      <!-- API設定ボタン -->
-      <button id="openSettingsBtn" type="button" class="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all active:scale-95 bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100">
-        <span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
-        <span id="apiKeyStatusText">API設定</span>
-        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="openSettingsBtn" type="button" class="relative flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-95 transition text-xs font-semibold text-slate-700" aria-label="設定を開く">
+          <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>設定</span>
+          <span id="apiKeyDot" class="hidden absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white"></span>
+        </button>
+      </div>
     </div>
   </header>
 
   <!-- メインコンテンツ -->
-  <main class="flex-1 max-w-lg w-full mx-auto px-4 pt-4 pb-8 space-y-5">
+  <main class="flex-1 max-w-lg w-full mx-auto px-4 pt-4 pb-28 space-y-4">
 
-    <!-- Step 1: スクショ＆テキスト入力カード -->
-    <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-bold flex items-center justify-center">1</span>
-          <h2 class="text-sm font-bold text-slate-800">スクショまたはテキストを入力</h2>
+    <!-- APIキー未設定バナー -->
+    <div id="apiKeyAlert" class="hidden rounded-2xl bg-amber-50 border border-amber-200/90 p-3.5 flex items-center justify-between gap-3">
+      <div class="flex items-start gap-2.5">
+        <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div class="text-xs text-amber-900 leading-relaxed">
+          <span class="font-bold">Gemini APIキーが未設定です。</span><br>
+          設定画面からAPIキーを登録すると返信案を生成できます。
         </div>
-        <button id="loadDemoBtn" type="button" class="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1 active:scale-95 transition">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </div>
+      <button id="alertSettingsBtn" type="button" class="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold active:scale-95 transition">
+        登録する
+      </button>
+    </div>
+
+    <!-- 1. トーク画面・テキスト入力カード -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 space-y-3.5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+          <span class="w-5 h-5 rounded-full bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center">1</span>
+          トーク内容を読み込む
+        </h2>
+        <span class="text-[11px] text-slate-400 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-          サンプルで試す
+          履歴・画像は保存されません
+        </span>
+      </div>
+
+      <!-- 画像入力ボタン群 -->
+      <div class="grid grid-cols-2 gap-2.5">
+        <label class="flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-xl border border-dashed border-brand-500/60 bg-brand-50/40 hover:bg-brand-50 active:scale-[0.98] transition cursor-pointer text-center">
+          <svg class="w-6 h-6 text-brand-700" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span class="text-xs font-bold text-brand-800">スクショを選択</span>
+          <span class="text-[10px] text-slate-500">複数枚OK・高速圧縮</span>
+          <input id="chatImageInput" type="file" accept="image/*" multiple class="hidden" />
+        </label>
+
+        <button id="pasteClipboardBtn" type="button" class="flex flex-col items-center justify-center gap-1.5 py-3.5 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] transition text-center">
+          <svg class="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <span class="text-xs font-bold text-slate-800">コピーから貼付</span>
+          <span class="text-[10px] text-slate-500">iPhoneスクショ対応</span>
         </button>
       </div>
 
-      <!-- 画像ドロップ＆選択エリア -->
-      <div id="dropZone" class="relative border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/70 hover:bg-brand-50/40 hover:border-brand-400 transition-all p-4 text-center">
-        <input id="fileInput" type="file" accept="image/*" multiple class="hidden" />
-        <div class="space-y-2.5">
-          <div class="w-11 h-11 rounded-full bg-brand-100/80 text-brand-600 mx-auto flex items-center justify-center">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+      <!-- プライバシーマスクスイッチ -->
+      <div class="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-200/70">
+        <div class="pr-2">
+          <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <span>プライバシー自動黒塗り</span>
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-100 text-brand-800">推奨</span>
           </div>
-          <div>
-            <p class="text-xs font-semibold text-slate-700">LINE・Slack・予約画面のスクショを選択</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">複数枚まとめて選択可・長辺1200pxへ自動軽量化</p>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <button id="selectImageBtn" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand-600 text-white text-xs font-bold shadow-sm hover:bg-brand-700 active:scale-95 transition">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              カメラロールから選択
-            </button>
-
-            <button id="pasteClipboardBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-100 active:scale-95 transition">
-              <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              画像をペースト
-            </button>
-          </div>
+          <p class="text-[11px] text-slate-500 mt-0.5">送信前に上部約12%（相手の名前・アイコン帯）を自動マスク</p>
         </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input id="privacyMaskToggle" type="checkbox" checked class="sr-only peer" />
+          <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+        </label>
       </div>
 
-      <!-- 選択済み画像プレビュー一覧 -->
+      <!-- 画像プレビューエリア（マスク反映後を表示） -->
       <div id="imagePreviewContainer" class="hidden space-y-2">
         <div class="flex items-center justify-between">
-          <span id="imageCountBadge" class="text-xs font-semibold text-slate-600">選択中の画像 (0枚)</span>
-          <button id="clearAllImagesBtn" type="button" class="text-[11px] font-medium text-rose-600 hover:underline">すべて削除</button>
+          <span class="text-[11px] font-semibold text-slate-600" id="imageCountLabel">読み込み済み画像</span>
+          <button id="clearImagesBtn" type="button" class="text-[11px] text-rose-600 font-semibold hover:underline">すべてクリア</button>
         </div>
         <div id="imagePreviewList" class="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar"></div>
+        <p class="text-[10px] text-slate-400">※サムネイルをタップすると、黒塗り適用後の送信画像を拡大確認できます</p>
       </div>
 
-      <!-- テキスト直接貼り付け・補足指示欄 -->
-      <div class="space-y-1.5">
-        <div class="flex items-center justify-between">
-          <label for="rawTextInput" class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-            </svg>
-            テキスト直接貼り付け / AIへの補足メモ（任意）
-          </label>
-          <button id="clearTextBtn" type="button" class="text-[11px] text-slate-400 hover:text-slate-600 hidden">クリア</button>
+      <!-- テキスト直接貼り付け -->
+      <div>
+        <label for="chatTextInput" class="block text-xs font-semibold text-slate-600 mb-1.5">
+          またはトーク本文を直接貼り付け <span class="font-normal text-slate-400">（画像と併用可）</span>
+        </label>
+        <textarea id="chatTextInput" rows="3" placeholder="例：相手「今週の金曜って空いてる？みんなで飲もうって話になってて！」" class="w-full rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none p-3 text-sm text-slate-800 placeholder:text-slate-400 transition resize-y"></textarea>
+      </div>
+    </section>
+
+    <!-- 2. 相手・状況のワンタップ設定カード -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 space-y-4">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-1.5 shrink-0">
+          <span class="w-5 h-5 rounded-full bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center">2</span>
+          相手と状況を選ぶ
+        </h2>
+        <!-- 文体プロファイルON/OFFバッジ -->
+        <button id="styleQuickToggle" type="button" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-semibold transition active:scale-95">
+          <span id="styleQuickDot" class="w-2 h-2 rounded-full"></span>
+          <span id="styleQuickLabel">文体未登録</span>
+        </button>
+      </div>
+
+      <!-- 相手属性 -->
+      <div class="space-y-2">
+        <div class="text-xs font-semibold text-slate-600">相手属性</div>
+        <div id="recipientChips" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <!-- 状況プリセット -->
+      <div class="space-y-2">
+        <div class="text-xs font-semibold text-slate-600">状況プリセット</div>
+        <div id="situationChips" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <!-- 吹き出しスタイル -->
+      <div class="space-y-2">
+        <div class="text-xs font-semibold text-slate-600">吹き出しスタイル</div>
+        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+          <button type="button" data-bubble-mode="single" class="bubble-mode-btn py-2 px-2.5 rounded-lg text-xs font-bold transition text-center">
+            1通にまとめる
+          </button>
+          <button type="button" data-bubble-mode="split" class="bubble-mode-btn py-2 px-2.5 rounded-lg text-xs font-bold transition text-center">
+            2〜3通の連投優先
+          </button>
         </div>
-        <textarea
-          id="rawTextInput"
-          rows="3"
-          placeholder="チャットのメッセージ本文をそのまま貼り付けるか、「来週金曜の候補だけ抽出して」などの補足を入力できます（画像がある場合は空欄でもOK）"
-          class="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition resize-none"
-        ></textarea>
+      </div>
+
+      <!-- 本音・補足メモ -->
+      <div class="space-y-1.5">
+        <label for="honneMemoInput" class="block text-xs font-semibold text-slate-600">
+          本音・補足メモ <span class="font-normal text-slate-400">（任意・1行）</span>
+        </label>
+        <input id="honneMemoInput" type="text" placeholder="例：本当は疲れてて行きたくない / 予算は5000円まで" class="w-full rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 transition" />
+        <p class="text-[10px] text-slate-400">書いた本音は相手を傷つけないよう自然にオブラートに包みます</p>
       </div>
     </section>
 
     <!-- ローディング表示 -->
-    <section id="loadingSection" class="hidden bg-white rounded-2xl shadow-sm border border-brand-100 p-6 text-center space-y-3 animate-fade-in">
-      <div class="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center">
+    <section id="loadingSection" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 text-center space-y-3 animate-fade-up">
+      <div class="inline-flex items-center justify-center w-11 h-11 rounded-full bg-brand-50 text-brand-700">
         <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
         </svg>
       </div>
       <div>
-        <p id="loadingTitle" class="text-sm font-bold text-slate-800">AIが日時・場所・詳細を解析中...</p>
-        <p id="loadingSubtext" class="text-xs text-slate-500 mt-1">「来週の金曜」「明後日」などの相対日時を計算しています</p>
+        <p id="loadingMessage" class="text-sm font-bold text-slate-800">空気を読んで返信案を作成中...</p>
+        <p id="loadingSubMessage" class="text-xs text-slate-500 mt-1">AIっぽさを消した4パターンを考えています</p>
       </div>
     </section>
 
-    <!-- Step 2: 抽出された予定カード一覧 -->
-    <section id="resultsSection" class="space-y-3">
-      <div class="flex items-center justify-between px-1">
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-full bg-brand-50 text-brand-600 text-xs font-bold flex items-center justify-center">2</span>
-          <h2 class="text-sm font-bold text-slate-800">抽出された予定の確認・ワンタップ登録</h2>
-          <span id="eventCountBadge" class="px-2 py-0.5 text-[11px] font-bold rounded-full bg-brand-100 text-brand-700">0件</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <button id="downloadAllIcsBtn" type="button" class="hidden text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 px-2.5 py-1 rounded-lg transition active:scale-95">
-            全件まとめて.ics
-          </button>
-          <button id="addEmptyCardBtn" type="button" class="text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition active:scale-95">
-            ＋ 手動追加
-          </button>
-        </div>
+    <!-- エラー表示 -->
+    <section id="errorSection" class="hidden rounded-2xl bg-rose-50 border border-rose-200 p-4 text-xs text-rose-800 space-y-1.5 animate-fade-up">
+      <div class="font-bold flex items-center gap-1.5">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>生成できませんでした</span>
       </div>
-
-      <!-- 空状態プレースホルダー -->
-      <div id="emptyStateBox" class="bg-white/70 rounded-2xl border border-slate-200/70 p-6 text-center space-y-2">
-        <p class="text-xs font-semibold text-slate-500">まだ予定が抽出されていません</p>
-        <p class="text-[11px] text-slate-400 leading-relaxed">
-          上のボタンからスクショを選択するか、メッセージ本文を貼り付けて<br />画面下部の「予定をAI抽出する」をタップしてください。
-        </p>
-      </div>
-
-      <!-- カードコンテナ -->
-      <div id="eventsListContainer" class="space-y-4"></div>
+      <p id="errorText" class="leading-relaxed whitespace-pre-line"></p>
     </section>
+
+    <!-- 3. 生成結果セクション -->
+    <section id="resultSection" class="hidden space-y-4 animate-fade-up">
+      <!-- 空気読みメモ -->
+      <div class="rounded-2xl bg-slate-900 text-white p-4 shadow-sm space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 text-[11px] font-bold text-brand-100 tracking-wide shrink-0">
+            <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>空気読みメモ</span>
+          </div>
+          <span id="usedModelBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-slate-200 truncate max-w-[215px]"></span>
+        </div>
+        <p id="airReadingMemoText" class="text-[13px] leading-relaxed text-slate-100 whitespace-pre-line"></p>
+      </div>
+
+      <!-- 4パターンカード群 -->
+      <div id="patternsContainer" class="space-y-3.5"></div>
+
+      <!-- 4案まとめてワンタップ微調整バー -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-700">4パターンまとめて微調整（リテイク）</span>
+          <span class="text-[10px] text-slate-400">文脈を保ったまま再生成</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" data-global-retake="もう少し短く" class="global-retake-btn py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-brand-50 hover:border-brand-300 text-xs font-semibold text-slate-700 active:scale-95 transition">
+            ✂️ もう少し短く
+          </button>
+          <button type="button" data-global-retake="もっとフランクに" class="global-retake-btn py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-brand-50 hover:border-brand-300 text-xs font-semibold text-slate-700 active:scale-95 transition">
+            😊 もっとフランクに
+          </button>
+          <button type="button" data-global-retake="もっと丁寧に" class="global-retake-btn py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-brand-50 hover:border-brand-300 text-xs font-semibold text-slate-700 active:scale-95 transition">
+            🙇 もっと丁寧に
+          </button>
+          <button type="button" data-global-retake="絵文字を減らす" class="global-retake-btn py-2 px-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-brand-50 hover:border-brand-300 text-xs font-semibold text-slate-700 active:scale-95 transition">
+            🫧 絵文字を減らす
+          </button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <!-- 画面下部固定アクションバー (片手親指操作・Safe Area対応) -->
-  <div class="fixed bottom-0 inset-x-0 z-20 bg-white/90 backdrop-blur-md border-t border-slate-200/80 px-4 pt-2.5 safe-bottom-bar">
-    <div class="max-w-lg mx-auto flex items-center gap-2.5">
-      <button
-        id="analyzeBtn"
-        type="button"
-        class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-brand-600 to-indigo-600 text-white font-bold text-sm shadow-md shadow-brand-500/25 hover:from-brand-700 hover:to-indigo-700 active:scale-[0.99] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+  <!-- 画面下部の固定アクションボタン -->
+  <div class="fixed bottom-0 inset-x-0 z-20 bg-white/90 backdrop-blur-md border-t border-slate-200/80 px-4 pt-3 safe-bottom">
+    <div class="max-w-lg mx-auto">
+      <button id="generateBtn" type="button" class="w-full py-3.5 px-5 rounded-2xl bg-brand-700 hover:bg-brand-800 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none text-white font-bold text-[15px] shadow-md shadow-brand-700/20 flex items-center justify-center gap-2 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
         </svg>
-        <span>予定をAI抽出する</span>
+        <span>自然な返信案を4パターン作成</span>
       </button>
     </div>
   </div>
 
-  <!-- 設定モーダル (APIキー & モデル選択) -->
-  <div id="settingsModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-fade-in">
-      <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-          <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-          </svg>
-          Gemini API設定
-        </h3>
-        <button id="closeSettingsBtn" type="button" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+  <!-- 設定・文体プロファイルモーダル -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-fade-up">
+      <!-- モーダルヘッダー -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+        <h3 class="text-base font-bold text-slate-900">設定・高速化・文体プロファイル</h3>
+        <button id="closeSettingsBtn" type="button" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition" aria-label="閉じる">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div class="p-5 space-y-4">
-        <div class="space-y-1.5">
-          <label for="apiKeyInput" class="block text-xs font-bold text-slate-700">Gemini APIキー</label>
-          <div class="relative">
-            <input
-              id="apiKeyInput"
-              type="password"
-              placeholder="AQ.... または AIzaSy..."
-              autocomplete="off"
-              class="w-full rounded-xl border border-slate-200 bg-slate-50 pl-3 pr-10 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none"
-            />
-            <button id="toggleApiKeyVisibilityBtn" type="button" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            </button>
-          </div>
-          <p class="text-[11px] text-slate-500 leading-relaxed">
-            キーはブラウザの <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">localStorage</code> にのみ保存されます（<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AQ.</code> / <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">AIzaSy</code> 両対応）。
-          </p>
-        </div>
+      <!-- モーダル本体 -->
+      <div class="overflow-y-auto px-5 py-4 space-y-6 safe-modal-bottom">
 
-        <div class="space-y-1.5">
+        <!-- セクションA: Gemini APIキー -->
+        <div class="space-y-2.5">
           <div class="flex items-center justify-between">
-            <label for="modelSelect" class="block text-xs font-bold text-slate-700">使用モデル（混雑時は自動で別モデルへ切替）</label>
-            <button id="refreshModelsBtn" type="button" class="text-[11px] font-semibold text-brand-600 hover:underline active:scale-95 transition">
-              一覧を取得
+            <label for="apiKeyInput" class="text-xs font-bold text-slate-800">Gemini APIキー</label>
+            <span class="text-[10px] text-slate-500">AQ. / AIzaSy 両対応</span>
+          </div>
+          <div class="relative">
+            <input id="apiKeyInput" type="password" autocomplete="off" placeholder="AQ.... または AIzaSy..." class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none pl-3.5 pr-16 py-2.5 text-sm font-mono text-slate-800" />
+            <button id="toggleApiKeyVisibility" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700">
+              表示
             </button>
           </div>
-          <select
-            id="modelSelect"
-            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
-          >
-            <option value="gemini-3.8-flash">gemini-3.8-flash（初期値）</option>
-          </select>
-          <p id="modelFetchStatus" class="text-[11px] text-slate-400">「一覧を取得」を押すとAPIで利用可能な最新モデルを読み込みます。</p>
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-[11px] text-slate-500 leading-snug">
+              キーはこのブラウザの <code class="text-[10px] bg-slate-100 px-1 rounded">localStorage</code> にのみ保存されます。
+            </p>
+            <button id="saveApiKeyBtn" type="button" class="shrink-0 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold active:scale-95 transition">
+              キーを保存
+            </button>
+          </div>
         </div>
 
-        <div class="space-y-1.5">
-          <label for="customModelInput" class="block text-xs font-bold text-slate-700">カスタムモデル名（任意・通常は空欄）</label>
-          <input
-            id="customModelInput"
-            type="text"
-            placeholder="空欄なら上の選択を使用"
-            autocomplete="off"
-            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
-          />
-        </div>
-      </div>
+        <hr class="border-slate-100" />
 
-      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-        <button id="clearApiKeyBtn" type="button" class="text-xs font-medium text-rose-600 hover:underline px-2 py-1.5">
-          キーを削除
-        </button>
-        <div class="flex items-center gap-2">
-          <button id="cancelSettingsBtn" type="button" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200/60 transition">
-            キャンセル
-          </button>
-          <button id="saveSettingsBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-600 text-white hover:bg-brand-700 shadow-sm transition active:scale-95">
-            保存する
-          </button>
+        <!-- セクションB: 高速化 & モデル自動切替 -->
+        <div class="space-y-3.5">
+          <!-- 高速応答モード（思考レベル最小化） -->
+          <div class="flex items-center justify-between">
+            <div class="pr-2">
+              <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span>高速応答モード（思考を軽量化）</span>
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-100 text-brand-800">推奨</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">内部の深い推論を最小限にして生成速度を2〜4倍に短縮</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input id="fastModeToggle" type="checkbox" checked class="sr-only peer" />
+              <div class="w-10 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+            </label>
+          </div>
+
+          <!-- 混雑時のモデル自動切替 -->
+          <div class="flex items-center justify-between">
+            <div class="pr-2">
+              <h4 class="text-xs font-bold text-slate-800">混雑時のモデル自動切替（8秒見切り）</h4>
+              <p class="text-[11px] text-slate-500 mt-0.5">8秒無応答・503混雑時に別の空きモデルへ即切替＆記憶</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input id="autoFallbackToggle" type="checkbox" checked class="sr-only peer" />
+              <div class="w-10 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+            </label>
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="primaryModelInput" class="block text-[11px] font-semibold text-slate-600">優先して使うモデル名</label>
+            <div class="flex gap-2">
+              <input id="primaryModelInput" type="text" placeholder="gemini-3.8-flash" class="flex-1 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-500 outline-none px-3 py-2 text-xs font-mono text-slate-800" />
+              <button id="saveModelBtn" type="button" class="shrink-0 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold active:scale-95 transition">
+                反映
+              </button>
+            </div>
+          </div>
+
+          <div class="rounded-xl bg-slate-50 border border-slate-200/80 p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[11px] font-semibold text-slate-700">このキーで利用可能なモデルを確認</span>
+              <button id="fetchModelsBtn" type="button" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-bold text-brand-700 active:scale-95 transition">
+                一覧を取得
+              </button>
+            </div>
+            <div id="availableModelsList" class="hidden flex flex-wrap gap-1.5 pt-1"></div>
+            <p class="text-[10px] text-slate-400 leading-snug">
+              ※速さを最優先したい場合は一覧から <code class="bg-white px-1 rounded">flash-lite</code> 系をタップして優先設定にするのがおすすめです。
+            </p>
+          </div>
         </div>
+
+        <hr class="border-slate-100" />
+
+        <!-- セクションC: 自分の文体登録 -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="text-xs font-bold text-slate-800">自分の文体登録（AI臭さの排除）</h4>
+              <p class="text-[11px] text-slate-500 mt-0.5">普段のLINEトークスクショ（1〜2枚）から文体の癖を自動抽出</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input id="useStyleProfileToggle" type="checkbox" class="sr-only peer" />
+              <div class="w-10 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
+            </label>
+          </div>
+
+          <!-- 文体解析用スクショ読み込み -->
+          <div class="rounded-xl bg-slate-50 border border-slate-200/80 p-3 space-y-2.5">
+            <div class="flex items-center gap-2">
+              <label class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer active:scale-[0.98] transition">
+                <svg class="w-4 h-4 text-brand-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>自分のトーク画面を選択（最大2枚）</span>
+                <input id="styleImageInput" type="file" accept="image/*" multiple class="hidden" />
+              </label>
+            </div>
+
+            <div id="styleImagePreviewList" class="hidden flex gap-2 overflow-x-auto no-scrollbar"></div>
+
+            <button id="analyzeStyleBtn" type="button" disabled class="w-full py-2 px-3 rounded-lg bg-brand-700 hover:bg-brand-800 disabled:bg-slate-300 disabled:text-slate-500 text-white text-xs font-bold active:scale-[0.99] transition flex items-center justify-center gap-1.5">
+              <span>Geminiで自分の文体を自動解析する</span>
+            </button>
+            <p class="text-[10px] text-slate-400">※解析用の画像も上部12%を自動黒塗りして送信し、端末に保存しません</p>
+          </div>
+
+          <!-- 保存・手動編集エリア -->
+          <div class="space-y-1.5">
+            <label for="styleProfileTextarea" class="block text-xs font-semibold text-slate-700">
+              文体プロファイル（手動編集OK）
+            </label>
+            <textarea id="styleProfileTextarea" rows="5" placeholder="例：&#10;・基本は柔らかいタメ口〜ですます混在&#10;・句点「。」はほぼ使わず改行で区切る&#10;・「！」は1文に1回程度、「笑」をたまに使う&#10;・絵文字は控えめ（🙏😅程度）、顔文字は使わない" class="w-full rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none p-3 text-xs leading-relaxed text-slate-800"></textarea>
+          </div>
+
+          <div class="flex items-center justify-between gap-2">
+            <button id="clearStyleBtn" type="button" class="text-xs text-rose-600 font-semibold hover:underline">
+              プロファイルを消去
+            </button>
+            <button id="saveStyleBtn" type="button" class="px-4 py-2 rounded-xl bg-brand-700 hover:bg-brand-800 text-white text-xs font-bold active:scale-95 transition">
+              文体を保存
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
 
+  <!-- 画像拡大確認ライトボックス（黒塗り確認用） -->
+  <div id="lightboxModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md flex items-center justify-between text-white mb-3">
+      <span id="lightboxCaption" class="text-xs font-semibold text-slate-200">送信前プレビュー</span>
+      <button id="closeLightboxBtn" type="button" class="px-3 py-1.5 rounded-lg bg-white/15 text-xs font-bold">閉じる</button>
+    </div>
+    <img id="lightboxImg" src="" alt="送信前プレビュー画像" class="max-h-[75vh] max-w-full rounded-xl object-contain border border-white/15 shadow-2xl" />
+  </div>
+
   <!-- トースト通知 -->
-  <div id="toastContainer" class="fixed top-16 inset-x-0 z-50 flex flex-col items-center gap-2 pointer-events-none px-4"></div>
+  <div id="toast" class="pointer-events-none fixed top-16 left-1/2 -translate-x-1/2 z-[60] opacity-0 transition-all duration-200 translate-y-1">
+    <div id="toastInner" class="px-4 py-2.5 rounded-full bg-slate-900/95 text-white text-xs font-semibold shadow-lg flex items-center gap-2 whitespace-nowrap">
+      <svg class="w-4 h-4 text-brand-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      <span id="toastMessage">コピーしました</span>
+    </div>
+  </div>
 
   <script>
-    /**************************************************************
-     * 定数・状態管理
-     **************************************************************/
-    const STORAGE_KEY_API = 'sc_cal_gemini_api_key';
-    const STORAGE_KEY_MODEL = 'sc_cal_gemini_model';
-    const STORAGE_KEY_CUSTOM_MODEL = 'sc_cal_gemini_custom_model';
-    const STORAGE_KEY_AVAILABLE_MODELS = 'sc_cal_available_models_v2';
-    const DEFAULT_MODEL = 'gemini-3.8-flash';
-    const MAX_IMAGE_DIMENSION = 1200;
-    const JPEG_QUALITY = 0.82;
-    const WEEKDAYS_JP = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
-    const WEEKDAYS_SHORT_JP = ['日', '月', '火', '水', '木', '金', '土'];
+    (() => {
+      // ==========================================
+      // 定数 & ストレージキー（画像・履歴は保存しない）
+      // ==========================================
+      const DEFAULT_PRIMARY_MODEL = 'gemini-3.8-flash';
+      // 混雑時に高速モデル優先で切り替える候補リスト
+      const STATIC_FALLBACK_MODELS = [
+        'gemini-3.8-flash',
+        'gemini-3.8-flash-lite',
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite',
+      ];
 
-    let selectedImages = [];
-    let extractedEvents = [];
-    let availableModels = [];
+      // 高速化パラメータ
+      const IMAGE_MAX_SIDE = 850;
+      const IMAGE_JPEG_QUALITY = 0.72;
+      const FAST_FAILOVER_TIMEOUT_MS = 8000;   // 次の候補がある場合は8秒で見切って切替
+      const FINAL_ATTEMPT_TIMEOUT_MS = 18000;  // 最後の候補は18秒まで待機
 
-    // DOM要素の参照
-    const openSettingsBtn = document.getElementById('openSettingsBtn');
-    const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-    const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const clearApiKeyBtn = document.getElementById('clearApiKeyBtn');
-    const settingsModal = document.getElementById('settingsModal');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const toggleApiKeyVisibilityBtn = document.getElementById('toggleApiKeyVisibilityBtn');
-    const modelSelect = document.getElementById('modelSelect');
-    const refreshModelsBtn = document.getElementById('refreshModelsBtn');
-    const modelFetchStatus = document.getElementById('modelFetchStatus');
-    const customModelInput = document.getElementById('customModelInput');
-    const apiKeyStatusDot = document.getElementById('apiKeyStatusDot');
-    const apiKeyStatusText = document.getElementById('apiKeyStatusText');
-    const currentClockDisplay = document.getElementById('currentClockDisplay');
-
-    const fileInput = document.getElementById('fileInput');
-    const selectImageBtn = document.getElementById('selectImageBtn');
-    const pasteClipboardBtn = document.getElementById('pasteClipboardBtn');
-    const dropZone = document.getElementById('dropZone');
-    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-    const imagePreviewList = document.getElementById('imagePreviewList');
-    const imageCountBadge = document.getElementById('imageCountBadge');
-    const clearAllImagesBtn = document.getElementById('clearAllImagesBtn');
-
-    const rawTextInput = document.getElementById('rawTextInput');
-    const clearTextBtn = document.getElementById('clearTextBtn');
-    const loadDemoBtn = document.getElementById('loadDemoBtn');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const loadingSection = document.getElementById('loadingSection');
-    const loadingTitle = document.getElementById('loadingTitle');
-    const loadingSubtext = document.getElementById('loadingSubtext');
-
-    const eventCountBadge = document.getElementById('eventCountBadge');
-    const emptyStateBox = document.getElementById('emptyStateBox');
-    const eventsListContainer = document.getElementById('eventsListContainer');
-    const downloadAllIcsBtn = document.getElementById('downloadAllIcsBtn');
-    const addEmptyCardBtn = document.getElementById('addEmptyCardBtn');
-
-    /**************************************************************
-     * ユーティリティ関数
-     **************************************************************/
-    function pad2(n) {
-      return String(n).padStart(2, '0');
-    }
-
-    function sleep(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    function formatDateYYYYMMDD(dateObj, sep = '-') {
-      const y = dateObj.getFullYear();
-      const m = pad2(dateObj.getMonth() + 1);
-      const d = pad2(dateObj.getDate());
-      return `${y}${sep}${m}${sep}${d}`;
-    }
-
-    function formatTimeHHMM(dateObj) {
-      return `${pad2(dateObj.getHours())}:${pad2(dateObj.getMinutes())}`;
-    }
-
-    function updateClockBanner() {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = now.getMonth() + 1;
-      const d = now.getDate();
-      const w = WEEKDAYS_JP[now.getDay()];
-      const hhmm = formatTimeHHMM(now);
-      currentClockDisplay.textContent = `基準: ${y}年${m}月${d}日(${w[0]}) ${hhmm}`;
-    }
-
-    function ensureValidEndDateTime(startDateStr, startTimeStr, endDateStr, endTimeStr, isAllDay) {
-      const todayStr = formatDateYYYYMMDD(new Date());
-      const validStartDate = /^\d{4}-\d{2}-\d{2}$/.test(startDateStr) ? startDateStr : todayStr;
-
-      if (isAllDay) {
-        const validEndDate = (/^\d{4}-\d{2}-\d{2}$/.test(endDateStr) && endDateStr >= validStartDate)
-          ? endDateStr
-          : validStartDate;
-        return {
-          startDate: validStartDate,
-          startTime: '',
-          endDate: validEndDate,
-          endTime: ''
-        };
-      }
-
-      const validStartTime = /^\d{2}:\d{2}$/.test(startTimeStr) ? startTimeStr : '19:00';
-      const [sy, sm, sd] = validStartDate.split('-').map(Number);
-      const [sh, smin] = validStartTime.split(':').map(Number);
-      const startObj = new Date(sy, sm - 1, sd, sh, smin, 0);
-
-      if (/^\d{4}-\d{2}-\d{2}$/.test(endDateStr) && /^\d{2}:\d{2}$/.test(endTimeStr)) {
-        const [ey, em, ed] = endDateStr.split('-').map(Number);
-        const [eh, emin] = endTimeStr.split(':').map(Number);
-        const endObj = new Date(ey, em - 1, ed, eh, emin, 0);
-        if (endObj > startObj) {
-          return {
-            startDate: validStartDate,
-            startTime: validStartTime,
-            endDate: endDateStr,
-            endTime: endTimeStr
-          };
-        }
-      }
-
-      const plus2Hours = new Date(startObj.getTime() + 2 * 60 * 60 * 1000);
-      return {
-        startDate: validStartDate,
-        startTime: validStartTime,
-        endDate: formatDateYYYYMMDD(plus2Hours, '-'),
-        endTime: formatTimeHHMM(plus2Hours)
+      const STORAGE_KEYS = {
+        API_KEY: 'kadonashi_gemini_api_key',
+        PRIMARY_MODEL: 'kadonashi_primary_model',
+        AUTO_FALLBACK: 'kadonashi_auto_fallback',
+        FAST_MODE: 'kadonashi_fast_mode',
+        STYLE_PROFILE: 'kadonashi_style_profile',
+        STYLE_ENABLED: 'kadonashi_style_enabled',
       };
-    }
 
-    function showToast(message, type = 'info') {
-      const container = document.getElementById('toastContainer');
-      const toast = document.createElement('div');
-      const bgClass = type === 'error'
-        ? 'bg-rose-600 text-white'
-        : type === 'success'
-          ? 'bg-emerald-600 text-white'
-          : 'bg-slate-800 text-white';
+      const RECIPIENT_OPTIONS = [
+        '友人・同僚',
+        '上司・先輩',
+        'グループLINE',
+        '家族・恋人',
+        'ビジネス・Slack',
+      ];
 
-      toast.className = `${bgClass} px-4 py-2.5 rounded-2xl shadow-lg text-xs font-semibold flex items-center gap-2 animate-fade-in pointer-events-auto max-w-md text-center`;
-      toast.innerHTML = `<span>${message}</span>`;
-      container.appendChild(toast);
+      const SITUATION_OPTIONS = [
+        'おまかせ',
+        'やんわり断る',
+        '放置明けリカバリー',
+        '会話のスマートな切り上げ',
+        '一旦保留・確認中',
+        '角を立てずに催促',
+        'グループ空気読み',
+        'お礼・フォロー',
+      ];
 
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.25s ease';
-        setTimeout(() => toast.remove(), 250);
-      }, 3600);
-    }
+      const PATTERN_BADGES = [
+        { bg: 'bg-slate-100', text: 'text-slate-700', accent: 'border-slate-200' },
+        { bg: 'bg-sky-50', text: 'text-sky-700', accent: 'border-sky-200' },
+        { bg: 'bg-emerald-50', text: 'text-emerald-700', accent: 'border-emerald-200' },
+        { bg: 'bg-amber-50', text: 'text-amber-800', accent: 'border-amber-200' },
+      ];
 
-    /**************************************************************
-     * 1. APIキー管理 & ListModels による利用可能モデル自動取得
-     **************************************************************/
-    function getApiKey() {
-      return (localStorage.getItem(STORAGE_KEY_API) || '').trim();
-    }
+      // ==========================================
+      // アプリ状態（メモリ内のみ）
+      // ==========================================
+      const savedAutoFallback = localStorage.getItem(STORAGE_KEYS.AUTO_FALLBACK);
+      const savedFastMode = localStorage.getItem(STORAGE_KEYS.FAST_MODE);
 
-    function getCustomModel() {
-      return (localStorage.getItem(STORAGE_KEY_CUSTOM_MODEL) || '').trim();
-    }
+      const state = {
+        apiKey: localStorage.getItem(STORAGE_KEYS.API_KEY) || '',
+        primaryModel: localStorage.getItem(STORAGE_KEYS.PRIMARY_MODEL) || DEFAULT_PRIMARY_MODEL,
+        autoFallback: savedAutoFallback === null ? true : savedAutoFallback === 'true',
+        fastMode: savedFastMode === null ? true : savedFastMode === 'true',
+        discoveredModels: [],
+        lastFastSuccessModel: '', // 直前に成功した空きモデルを記憶（セッション内）
 
-    function getDropdownModel() {
-      const saved = (localStorage.getItem(STORAGE_KEY_MODEL) || '').trim();
-      // 非存在・終了モデルが保存されている場合は補正
-      const invalidSaved = ['gemini-2.5-flash', 'gemini-3.8-flash-lite'];
-      if (!saved || invalidSaved.includes(saved)) {
-        const fallback = availableModels[0]?.id || DEFAULT_MODEL;
-        localStorage.setItem(STORAGE_KEY_MODEL, fallback);
-        return fallback;
+        styleProfile: localStorage.getItem(STORAGE_KEYS.STYLE_PROFILE) || '',
+        styleEnabled: localStorage.getItem(STORAGE_KEYS.STYLE_ENABLED) === 'true',
+
+        privacyMask: true,
+        recipient: RECIPIENT_OPTIONS[0],
+        situation: SITUATION_OPTIONS[0],
+        bubbleMode: 'split', // 'single' | 'split'
+
+        chatImages: [],
+        styleImages: [],
+
+        lastResult: null,
+        lastUsedModel: '',
+        lastElapsedSec: null,
+        isGenerating: false,
+      };
+
+      // ==========================================
+      // DOM 参照
+      // ==========================================
+      const els = {
+        openSettingsBtn: document.getElementById('openSettingsBtn'),
+        alertSettingsBtn: document.getElementById('alertSettingsBtn'),
+        apiKeyDot: document.getElementById('apiKeyDot'),
+        apiKeyAlert: document.getElementById('apiKeyAlert'),
+
+        chatImageInput: document.getElementById('chatImageInput'),
+        pasteClipboardBtn: document.getElementById('pasteClipboardBtn'),
+        privacyMaskToggle: document.getElementById('privacyMaskToggle'),
+        imagePreviewContainer: document.getElementById('imagePreviewContainer'),
+        imageCountLabel: document.getElementById('imageCountLabel'),
+        imagePreviewList: document.getElementById('imagePreviewList'),
+        clearImagesBtn: document.getElementById('clearImagesBtn'),
+        chatTextInput: document.getElementById('chatTextInput'),
+
+        recipientChips: document.getElementById('recipientChips'),
+        situationChips: document.getElementById('situationChips'),
+        bubbleModeBtns: document.querySelectorAll('.bubble-mode-btn'),
+        honneMemoInput: document.getElementById('honneMemoInput'),
+
+        styleQuickToggle: document.getElementById('styleQuickToggle'),
+        styleQuickDot: document.getElementById('styleQuickDot'),
+        styleQuickLabel: document.getElementById('styleQuickLabel'),
+
+        generateBtn: document.getElementById('generateBtn'),
+        loadingSection: document.getElementById('loadingSection'),
+        loadingMessage: document.getElementById('loadingMessage'),
+        loadingSubMessage: document.getElementById('loadingSubMessage'),
+        errorSection: document.getElementById('errorSection'),
+        errorText: document.getElementById('errorText'),
+        resultSection: document.getElementById('resultSection'),
+        usedModelBadge: document.getElementById('usedModelBadge'),
+        airReadingMemoText: document.getElementById('airReadingMemoText'),
+        patternsContainer: document.getElementById('patternsContainer'),
+        globalRetakeBtns: document.querySelectorAll('.global-retake-btn'),
+
+        // 設定モーダル
+        settingsModal: document.getElementById('settingsModal'),
+        closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+        apiKeyInput: document.getElementById('apiKeyInput'),
+        toggleApiKeyVisibility: document.getElementById('toggleApiKeyVisibility'),
+        saveApiKeyBtn: document.getElementById('saveApiKeyBtn'),
+
+        fastModeToggle: document.getElementById('fastModeToggle'),
+        autoFallbackToggle: document.getElementById('autoFallbackToggle'),
+        primaryModelInput: document.getElementById('primaryModelInput'),
+        saveModelBtn: document.getElementById('saveModelBtn'),
+        fetchModelsBtn: document.getElementById('fetchModelsBtn'),
+        availableModelsList: document.getElementById('availableModelsList'),
+
+        useStyleProfileToggle: document.getElementById('useStyleProfileToggle'),
+        styleImageInput: document.getElementById('styleImageInput'),
+        styleImagePreviewList: document.getElementById('styleImagePreviewList'),
+        analyzeStyleBtn: document.getElementById('analyzeStyleBtn'),
+        styleProfileTextarea: document.getElementById('styleProfileTextarea'),
+        clearStyleBtn: document.getElementById('clearStyleBtn'),
+        saveStyleBtn: document.getElementById('saveStyleBtn'),
+
+        // ライトボックス
+        lightboxModal: document.getElementById('lightboxModal'),
+        lightboxCaption: document.getElementById('lightboxCaption'),
+        lightboxImg: document.getElementById('lightboxImg'),
+        closeLightboxBtn: document.getElementById('closeLightboxBtn'),
+
+        // トースト
+        toast: document.getElementById('toast'),
+        toastMessage: document.getElementById('toastMessage'),
+      };
+
+      // ==========================================
+      // ユーティリティ
+      // ==========================================
+      let toastTimer = null;
+      function showToast(message) {
+        els.toastMessage.textContent = message;
+        els.toast.classList.remove('opacity-0', 'translate-y-1');
+        els.toast.classList.add('opacity-100', 'translate-y-0');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          els.toast.classList.remove('opacity-100', 'translate-y-0');
+          els.toast.classList.add('opacity-0', 'translate-y-1');
+        }, 2300);
       }
-      return saved;
-    }
 
-    function getSelectedModel() {
-      return getCustomModel() || getDropdownModel();
-    }
-
-    function loadCachedModels() {
-      try {
-        const cached = JSON.parse(localStorage.getItem(STORAGE_KEY_AVAILABLE_MODELS) || '[]');
-        if (Array.isArray(cached) && cached.length > 0) {
-          availableModels = cached;
-        }
-      } catch (e) {
-        availableModels = [];
-      }
-      renderModelSelectOptions();
-    }
-
-    function renderModelSelectOptions(preferredModel = null) {
-      const current = preferredModel || getDropdownModel();
-      const list = availableModels.length > 0
-        ? availableModels
-        : [{ id: DEFAULT_MODEL, displayName: `${DEFAULT_MODEL}（初期値）` }];
-
-      modelSelect.innerHTML = '';
-      let matched = false;
-
-      list.forEach((m) => {
-        const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.displayName && m.displayName !== m.id
-          ? `${m.id}（${m.displayName}）`
-          : m.id;
-        if (m.id === current) {
-          opt.selected = true;
-          matched = true;
-        }
-        modelSelect.appendChild(opt);
-      });
-
-      if (!matched && list.length > 0) {
-        modelSelect.value = list[0].id;
-        localStorage.setItem(STORAGE_KEY_MODEL, list[0].id);
-      }
-    }
-
-    // ListModels API から実際に利用可能なGeminiモデル一覧を取得
-    async function fetchAvailableModels(apiKey, silent = false) {
-      const key = (apiKey || getApiKey()).trim();
-      if (!key) {
-        if (!silent) modelFetchStatus.textContent = '先にAPIキーを入力してから「一覧を取得」を押してください。';
-        return [];
-      }
-
-      if (!silent) {
-        refreshModelsBtn.disabled = true;
-        modelFetchStatus.textContent = '利用可能なモデル一覧を取得中...';
-      }
-
-      try {
-        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', {
-          method: 'GET',
-          headers: { 'x-goog-api-key': key }
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-        const rawList = Array.isArray(data.models) ? data.models : [];
-
-        const filtered = rawList
-          .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
-          .map(m => ({
-            id: String(m.name || '').replace(/^models\//, ''),
-            displayName: m.displayName || ''
-          }))
-          .filter(m => /^gemini-/i.test(m.id) && !/(embedding|tts|image|audio|robotics|computer-use|deep-research|live|2\.5-flash$)/i.test(m.id));
-
-        // 使いやすいFlash系・最新モデルを上位に並べる
-        const scoreModel = (id) => {
-          let s = 0;
-          if (/flash/i.test(id)) s += 30;
-          if (/lite/i.test(id)) s += 10;
-          if (/pro/i.test(id)) s += 15;
-          if (/latest/i.test(id)) s += 8;
-          if (/preview|exp/i.test(id)) s -= 2;
-          if (/^gemini-1\.|^gemini-2\.0/i.test(id)) s -= 20;
-          return s;
-        };
-
-        filtered.sort((a, b) => scoreModel(b.id) - scoreModel(a.id) || b.id.localeCompare(a.id));
-
-        if (filtered.length > 0) {
-          availableModels = filtered;
-          localStorage.setItem(STORAGE_KEY_AVAILABLE_MODELS, JSON.stringify(filtered));
-          renderModelSelectOptions();
-          if (!silent) {
-            modelFetchStatus.textContent = `利用可能な ${filtered.length} 個のモデルを取得しました。`;
+      async function copyToClipboard(text, label = 'コピーしました') {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            throw new Error('fallback');
           }
-          return filtered;
-        } else {
-          if (!silent) modelFetchStatus.textContent = '対象モデルが見つかりませんでした。';
-          return [];
+          showToast(label);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand('copy');
+            showToast(label);
+          } catch {
+            showToast('コピーに失敗しました');
+          }
+          document.body.removeChild(ta);
         }
-      } catch (err) {
-        console.warn('ListModels failed:', err);
-        if (!silent) {
-          modelFetchStatus.textContent = `モデル一覧の取得に失敗しました (${err.message})。`;
-        }
-        return [];
-      } finally {
-        refreshModelsBtn.disabled = false;
-      }
-    }
-
-    function updateApiKeyStatusUI() {
-      const key = getApiKey();
-      if (key) {
-        apiKeyStatusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-        apiKeyStatusText.textContent = 'API設定済';
-      } else {
-        apiKeyStatusDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
-        apiKeyStatusText.textContent = 'API未設定';
-      }
-    }
-
-    function openSettingsModal() {
-      apiKeyInput.value = getApiKey();
-      customModelInput.value = getCustomModel();
-      renderModelSelectOptions();
-      settingsModal.classList.remove('hidden');
-      settingsModal.classList.add('flex');
-
-      // APIキーがあり一覧未取得なら自動で取得
-      if (getApiKey() && availableModels.length === 0) {
-        fetchAvailableModels(getApiKey(), false);
-      }
-    }
-
-    function closeSettingsModal() {
-      settingsModal.classList.add('hidden');
-      settingsModal.classList.remove('flex');
-    }
-
-    openSettingsBtn.addEventListener('click', openSettingsModal);
-    closeSettingsBtn.addEventListener('click', closeSettingsModal);
-    cancelSettingsBtn.addEventListener('click', closeSettingsModal);
-    refreshModelsBtn.addEventListener('click', () => {
-      fetchAvailableModels(apiKeyInput.value.trim() || getApiKey(), false);
-    });
-
-    toggleApiKeyVisibilityBtn.addEventListener('click', () => {
-      apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
-    });
-
-    saveSettingsBtn.addEventListener('click', async () => {
-      const key = apiKeyInput.value.trim();
-      const model = modelSelect.value;
-      const customModel = customModelInput.value.trim();
-
-      if (key) {
-        localStorage.setItem(STORAGE_KEY_API, key);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_API);
-      }
-      localStorage.setItem(STORAGE_KEY_MODEL, model);
-
-      if (customModel) {
-        localStorage.setItem(STORAGE_KEY_CUSTOM_MODEL, customModel);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_CUSTOM_MODEL);
       }
 
-      updateApiKeyStatusUI();
-      closeSettingsModal();
-      showToast('API設定を保存しました', 'success');
-
-      if (key && availableModels.length === 0) {
-        fetchAvailableModels(key, true);
-      }
-    });
-
-    clearApiKeyBtn.addEventListener('click', () => {
-      localStorage.removeItem(STORAGE_KEY_API);
-      apiKeyInput.value = '';
-      updateApiKeyStatusUI();
-      showToast('APIキーを削除しました', 'info');
-    });
-
-    /**************************************************************
-     * 2. 画像入力とCanvas軽量化処理 (長辺1200px・JPEG圧縮)
-     **************************************************************/
-    function compressImageWithCanvas(fileOrBlob) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onload = () => {
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height && width > MAX_IMAGE_DIMENSION) {
-              height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
-              width = MAX_IMAGE_DIMENSION;
-            } else if (height >= width && height > MAX_IMAGE_DIMENSION) {
-              width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
-              height = MAX_IMAGE_DIMENSION;
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = width;
-            canvas.height = height;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, width, height);
-            ctx.drawImage(img, 0, 0, width, height);
-
-            const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
-            const base64 = dataUrl.split(',')[1];
-            const sizeKB = Math.round((base64.length * 3) / 4 / 1024);
-
-            resolve({
-              id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-              dataUrl,
-              base64,
-              mimeType: 'image/jpeg',
-              width,
-              height,
-              sizeKB
-            });
+      function loadFileToImage(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+            img.src = reader.result;
           };
-          img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
-          img.src = e.target.result;
-        };
-        reader.onerror = () => reject(new Error('ファイルの読み取りに失敗しました'));
-        reader.readAsDataURL(fileOrBlob);
-      });
-    }
-
-    async function handleImageFiles(files) {
-      const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-      if (imageFiles.length === 0) return;
-
-      try {
-        const compressedList = await Promise.all(imageFiles.map(file => compressImageWithCanvas(file)));
-        selectedImages.push(...compressedList);
-        renderImagePreviews();
-        showToast(`${compressedList.length}枚の画像を軽量化して追加しました`, 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('画像の処理中にエラーが発生しました', 'error');
-      }
-    }
-
-    function renderImagePreviews() {
-      if (selectedImages.length === 0) {
-        imagePreviewContainer.classList.add('hidden');
-        imagePreviewList.innerHTML = '';
-        return;
-      }
-
-      imagePreviewContainer.classList.remove('hidden');
-      imageCountBadge.textContent = `選択中の画像 (${selectedImages.length}枚)`;
-      imagePreviewList.innerHTML = '';
-
-      selectedImages.forEach((imgItem) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'relative shrink-0 w-24 h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-xs group';
-        wrapper.innerHTML = `
-          <img src="${imgItem.dataUrl}" alt="preview" class="w-full h-full object-cover" />
-          <div class="absolute bottom-0 inset-x-0 bg-slate-900/70 text-[10px] text-white px-1.5 py-0.5 truncate text-center">
-            ${imgItem.width}×${imgItem.height} (${imgItem.sizeKB}KB)
-          </div>
-          <button type="button" data-id="${imgItem.id}" class="remove-img-btn absolute top-1 right-1 w-6 h-6 rounded-full bg-slate-900/75 text-white flex items-center justify-center hover:bg-rose-600 transition">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        `;
-        imagePreviewList.appendChild(wrapper);
-      });
-
-      imagePreviewList.querySelectorAll('.remove-img-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const targetId = e.currentTarget.getAttribute('data-id');
-          selectedImages = selectedImages.filter(item => item.id !== targetId);
-          renderImagePreviews();
+          reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+          reader.readAsDataURL(file);
         });
-      });
-    }
-
-    selectImageBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
-      if (e.target.files.length > 0) {
-        handleImageFiles(e.target.files);
-        fileInput.value = '';
       }
-    });
 
-    clearAllImagesBtn.addEventListener('click', () => {
-      selectedImages = [];
-      renderImagePreviews();
-    });
-
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropZone.classList.add('border-brand-500', 'bg-brand-50/50');
-    });
-    dropZone.addEventListener('dragleave', () => {
-      dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
-    });
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('border-brand-500', 'bg-brand-50/50');
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        handleImageFiles(e.dataTransfer.files);
-      }
-    });
-
-    window.addEventListener('paste', (e) => {
-      if (!e.clipboardData) return;
-      const items = Array.from(e.clipboardData.items);
-      const imageItems = items.filter(item => item.type.startsWith('image/'));
-      if (imageItems.length > 0) {
-        e.preventDefault();
-        const files = imageItems.map(item => item.getAsFile()).filter(Boolean);
-        handleImageFiles(files);
-      }
-    });
-
-    pasteClipboardBtn.addEventListener('click', async () => {
-      if (!navigator.clipboard || !navigator.clipboard.read) {
-        showToast('画面長押しまたはCtrl+Vで貼り付けてください', 'info');
-        return;
-      }
-      try {
-        const clipboardItems = await navigator.clipboard.read();
-        const blobs = [];
-        for (const item of clipboardItems) {
-          const imageType = item.types.find(type => type.startsWith('image/'));
-          if (imageType) {
-            const blob = await item.getType(imageType);
-            blobs.push(blob);
-          } else if (item.types.includes('text/plain')) {
-            const textBlob = await item.getType('text/plain');
-            const text = await textBlob.text();
-            if (text && !rawTextInput.value.includes(text)) {
-              rawTextInput.value = (rawTextInput.value ? rawTextInput.value + '\n' : '') + text;
-              clearTextBtn.classList.remove('hidden');
-              showToast('クリップボードのテキストを貼り付けました', 'success');
-            }
+      /**
+       * HTML5 Canvasで長辺850pxに軽量リサイズ＋JPEG圧縮＋上部12%黒塗りマスク処理
+       */
+      function processImageOnCanvas(img, applyMask = true, maxSide = IMAGE_MAX_SIDE, quality = IMAGE_JPEG_QUALITY) {
+        let { naturalWidth: w, naturalHeight: h } = img;
+        if (w > maxSide || h > maxSide) {
+          if (w >= h) {
+            h = Math.round((h * maxSide) / w);
+            w = maxSide;
+          } else {
+            w = Math.round((w * maxSide) / h);
+            h = maxSide;
           }
         }
-        if (blobs.length > 0) {
-          await handleImageFiles(blobs);
-        } else if (!rawTextInput.value) {
-          showToast('クリップボードに画像が見つかりませんでした', 'info');
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+
+        if (applyMask) {
+          const maskHeight = Math.round(h * 0.12);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(0, 0, w, maskHeight);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          const fontSize = Math.max(11, Math.round(maskHeight * 0.22));
+          ctx.font = `600 ${fontSize}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('PRIVACY MASKED', w / 2, maskHeight / 2);
         }
-      } catch (err) {
-        showToast('ブラウザの権限によりアクセスできません。カメラロールから選択してください', 'info');
-      }
-    });
 
-    rawTextInput.addEventListener('input', () => {
-      clearTextBtn.classList.toggle('hidden', !rawTextInput.value.trim());
-    });
-    clearTextBtn.addEventListener('click', () => {
-      rawTextInput.value = '';
-      clearTextBtn.classList.add('hidden');
-    });
-
-    /**************************************************************
-     * 3. 相対日時の推論 & Gemini API (自動リトライ・別モデル自動切替)
-     **************************************************************/
-    function buildRelativeDateReferencePrompt() {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = now.getMonth() + 1;
-      const d = now.getDate();
-      const weekday = WEEKDAYS_JP[now.getDay()];
-      const timeStr = formatTimeHHMM(now);
-
-      const upcomingDaysLines = [];
-      for (let i = 0; i <= 21; i++) {
-        const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-        const dateStr = formatDateYYYYMMDD(target, '-');
-        const wName = WEEKDAYS_JP[target.getDay()];
-        let label = '';
-        if (i === 0) label = '（今日）';
-        else if (i === 1) label = '（明日）';
-        else if (i === 2) label = '（明後日）';
-        upcomingDaysLines.push(`- ${dateStr} : ${wName} ${label}`);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const base64 = dataUrl.split(',')[1];
+        return { dataUrl, base64, width: w, height: h };
       }
 
-      return `あなたはチャット画面（LINEやSlackなど）や予約確認画面のスクリーンショット・テキストから、カレンダー登録用の予定情報を正確に抽出するアシスタントです。
+      // ==========================================
+      // モデルごとの思考設定（高速化の中核）
+      // ==========================================
+      function buildThinkingConfig(modelName) {
+        if (!state.fastMode) return null;
+        const lower = modelName.toLowerCase();
 
-【最重要：現在の日時基準】
-現在の日時は「${y}年${m}月${d}日 ${weekday} ${timeStr} (JST)」です。
-画像やテキスト内の「今日」「明日」「明後日」「今度の土日」「来週の金曜」「再来週の水曜」などの相対的な日付表現は、以下のカレンダー対照表を参照して正確な日付（YYYY-MM-DD）に変換してください：
-${upcomingDaysLines.join('\n')}
+        // Gemini 3系・4系：thinkingLevel: "low" で推論コストを最小化
+        if (/gemini-[34]/.test(lower)) {
+          return { thinkingLevel: 'low' };
+        }
+        // Gemini 2.5 Flash / Flash-Lite 系：thinkingBudget: 0 で思考オフ（最速）
+        if (lower.includes('gemini-2.5-flash')) {
+          return { thinkingBudget: 0 };
+        }
+        // Gemini 2.5 Pro 系：思考オフ不可のため最小予算を指定
+        if (lower.includes('gemini-2.5-pro')) {
+          return { thinkingBudget: 128 };
+        }
+        return null;
+      }
 
-【抽出ルール】
-1. 1枚のスクショやテキストに複数の予定（例：行きと帰りのフライト・新幹線、飲み会の候補日が複数ある場合、複数日程のイベントなど）が含まれる場合は、すべての予定を別々のオブジェクトとして配列で抽出してください。
-2. 開始時刻が判明していて終了時刻が明記されていない場合は、開始時刻から2時間後の日時を終了日時（endDate, endTime）に設定してください。
-3. 時刻の指定がない予定（終日イベント）は isAllDay を true にし、startTime と endTime は空文字 "" にしてください。
-4. 場所（location）には店名・施設名・住所・駅名・空港便名ゲートなどを具体的に記載してください。
-5. メモ（description）には同伴者、持ち物、予約番号、会費、集合場所、候補日のステータスなどの要点を簡潔にまとめてください。`;
-    }
+      // ==========================================
+      // 利用可能モデルの自動取得 & 優先順位付け
+      // ==========================================
+      function rankModelName(name) {
+        const lower = name.toLowerCase();
+        let score = 0;
+        const verMatch = lower.match(/gemini-(\d+)(?:\.(\d+))?/);
+        if (verMatch) {
+          score += parseInt(verMatch[1], 10) * 100;
+          score += parseInt(verMatch[2] || '0', 10) * 10;
+        }
+        // 高速応答のため flash-lite / flash を上位に優先
+        if (lower.includes('flash-lite')) score += 35;
+        else if (lower.includes('flash')) score += 30;
+        else if (lower.includes('pro')) score += 10;
+        if (lower.includes('exp') || lower.includes('preview')) score -= 5;
+        return score;
+      }
 
-    const SCHEDULE_RESPONSE_SCHEMA = {
-      type: 'OBJECT',
-      properties: {
-        events: {
-          type: 'ARRAY',
-          description: '抽出された予定のリスト',
-          items: {
-            type: 'OBJECT',
-            properties: {
-              title: { type: 'STRING', description: '予定のタイトル' },
-              startDate: { type: 'STRING', description: '開始日（YYYY-MM-DD形式）' },
-              startTime: { type: 'STRING', description: '開始時刻（HH:MM 24時間表記。終日の場合は空文字）' },
-              endDate: { type: 'STRING', description: '終了日（YYYY-MM-DD形式）' },
-              endTime: { type: 'STRING', description: '終了時刻（HH:MM 24時間表記。不明な場合は開始時刻の2時間後。終日の場合は空文字）' },
-              isAllDay: { type: 'BOOLEAN', description: '終日イベントかどうか' },
-              location: { type: 'STRING', description: '場所（店名、住所、駅名など。不明な場合は空文字）' },
-              url: { type: 'STRING', description: '関連URL（不明な場合は空文字）' },
-              description: { type: 'STRING', description: 'メモ詳細（同伴者、予約番号、持ち物、料金、補足情報の要約）' }
+      async function discoverAvailableModels(forceRefresh = false) {
+        const apiKey = state.apiKey.trim();
+        if (!apiKey) return [];
+        if (state.discoveredModels.length > 0 && !forceRefresh) {
+          return state.discoveredModels;
+        }
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
+        try {
+          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', {
+            method: 'GET',
+            headers: {
+              'x-goog-api-key': apiKey,
             },
-            required: ['title', 'startDate', 'startTime', 'endDate', 'endTime', 'isAllDay', 'location', 'url', 'description']
-          }
-        }
-      },
-      required: ['events']
-    };
-
-    async function callSingleModelOnce(model, apiKey, payload) {
-      const encodedModel = encodeURIComponent(model);
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodedModel}:generateContent`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify(payload)
-      });
-
-      let bodyJson = null;
-      try {
-        bodyJson = await response.json();
-      } catch (_) {}
-
-      return {
-        ok: response.ok,
-        status: response.status,
-        bodyJson,
-        errorMessage: bodyJson?.error?.message || `APIエラー (HTTP ${response.status})`
-      };
-    }
-
-    function isOverloadError(status, msg) {
-      return status === 503 || status === 429 || /high demand|overloaded|try again|rate limit|quota/i.test(msg || '');
-    }
-
-    function isModelMissingError(status, msg) {
-      return status === 404 || /not found|no longer available|not supported|deprecated/i.test(msg || '');
-    }
-
-    // 選択モデルで実行 → 混雑時はリトライ → それでもダメなら ListModels から別モデルへ自動切替
-    async function requestGeminiWithFallback(primaryModel, apiKey, payload) {
-      let lastError = '';
-      let primaryMissing = false;
-
-      // 1) 選択モデルで実行（混雑時は最大2回リトライ）
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt === 0) {
-          loadingTitle.textContent = 'AIが日時・場所・詳細を解析中...';
-          loadingSubtext.textContent = `モデル: ${primaryModel}`;
-        } else {
-          const waitSec = attempt * 2;
-          loadingTitle.textContent = `サーバー混雑のため自動再試行中 (${attempt}/2)...`;
-          loadingSubtext.textContent = `${waitSec}秒後に ${primaryModel} へ再接続します`;
-          await sleep(waitSec * 1000);
-        }
-
-        const res = await callSingleModelOnce(primaryModel, apiKey, payload);
-        if (res.ok) {
-          return { bodyJson: res.bodyJson, usedModel: primaryModel, switched: false };
-        }
-
-        lastError = res.errorMessage;
-        if (isModelMissingError(res.status, res.errorMessage)) {
-          primaryMissing = true;
-          break;
-        }
-        if (!isOverloadError(res.status, res.errorMessage)) {
-          // 認証エラー等は即座に終了
-          throw new Error(lastError);
-        }
-      }
-
-      // 2) ListModels で現在利用可能な別モデルを取得して自動フォールバック
-      loadingTitle.textContent = '利用可能な別モデルを検索中...';
-      loadingSubtext.textContent = '混雑や非対応を回避して自動切替を試みます';
-
-      const liveModels = availableModels.length > 0
-        ? availableModels
-        : await fetchAvailableModels(apiKey, true);
-
-      const candidates = liveModels
-        .map(m => m.id)
-        .filter(id => id !== primaryModel)
-        .slice(0, 6);
-
-      for (const altModel of candidates) {
-        loadingTitle.textContent = '別モデルへ自動切替して解析中...';
-        loadingSubtext.textContent = `試行中: ${altModel}`;
-
-        const res = await callSingleModelOnce(altModel, apiKey, payload);
-        if (res.ok) {
-          // 元のモデルが存在しなかった場合は、成功したモデルを次回用に自動保存
-          if (primaryMissing) {
-            localStorage.setItem(STORAGE_KEY_MODEL, altModel);
-            renderModelSelectOptions(altModel);
-          }
-          return { bodyJson: res.bodyJson, usedModel: altModel, switched: true };
-        }
-        lastError = `${altModel}: ${res.errorMessage}`;
-      }
-
-      throw new Error(lastError || '利用可能なすべてのモデルで抽出に失敗しました。少し時間を置いてお試しください。');
-    }
-
-    async function analyzeScheduleWithGemini() {
-      const apiKey = getApiKey();
-      if (!apiKey) {
-        openSettingsModal();
-        showToast('先にGemini APIキーを設定してください', 'info');
-        return;
-      }
-
-      const rawText = rawTextInput.value.trim();
-      if (selectedImages.length === 0 && !rawText) {
-        showToast('スクショを選択するか、テキストを入力してください', 'info');
-        return;
-      }
-
-      const model = getSelectedModel();
-      analyzeBtn.disabled = true;
-      loadingSection.classList.remove('hidden');
-
-      try {
-        const userParts = [];
-
-        selectedImages.forEach((img) => {
-          userParts.push({
-            inlineData: {
-              mimeType: img.mimeType,
-              data: img.base64
-            }
+            signal: controller.signal,
           });
+          if (!res.ok) return [];
+          const data = await res.json();
+          const rawModels = Array.isArray(data?.models) ? data.models : [];
+
+          const excludePattern = /embedding|aqa|imagen|veo|tts|audio|live|robotics|computer-use|deep-research|learnlm|gemma|thinking-exp|vision-001|1\.0|1\.5/i;
+
+          const filtered = rawModels
+            .filter((m) => {
+              const methods = m.supportedGenerationMethods || [];
+              const shortName = (m.name || '').replace(/^models\//, '');
+              return (
+                methods.includes('generateContent') &&
+                /^gemini-/i.test(shortName) &&
+                !excludePattern.test(shortName)
+              );
+            })
+            .map((m) => m.name.replace(/^models\//, ''));
+
+          const unique = Array.from(new Set(filtered)).sort((a, b) => rankModelName(b) - rankModelName(a));
+          state.discoveredModels = unique;
+          return unique;
+        } catch {
+          return [];
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      function buildModelCandidateQueue() {
+        const primary = (state.primaryModel || DEFAULT_PRIMARY_MODEL).trim();
+        if (!state.autoFallback) {
+          return [primary];
+        }
+
+        const queue = [];
+        // 直前にサクッと成功したモデルがあれば最優先にして空振りロスを防ぐ
+        if (state.lastFastSuccessModel) {
+          queue.push(state.lastFastSuccessModel);
+        }
+        if (!queue.includes(primary)) {
+          queue.push(primary);
+        }
+        state.discoveredModels.forEach((m) => {
+          if (!queue.includes(m)) queue.push(m);
+        });
+        STATIC_FALLBACK_MODELS.forEach((m) => {
+          if (!queue.includes(m)) queue.push(m);
+        });
+        return queue;
+      }
+
+      function renderAvailableModelsInSettings(models) {
+        els.availableModelsList.innerHTML = '';
+        if (!models.length) {
+          els.availableModelsList.classList.add('hidden');
+          return;
+        }
+        els.availableModelsList.classList.remove('hidden');
+
+        models.forEach((modelName) => {
+          const isCurrent = modelName === state.primaryModel;
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.textContent = modelName;
+          chip.className = isCurrent
+            ? 'px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-brand-700 text-white'
+            : 'px-2 py-1 rounded-lg text-[10px] font-mono font-semibold bg-white border border-slate-200 text-slate-700 hover:border-brand-400 active:scale-95 transition';
+          chip.addEventListener('click', () => {
+            els.primaryModelInput.value = modelName;
+            state.primaryModel = modelName;
+            state.lastFastSuccessModel = '';
+            localStorage.setItem(STORAGE_KEYS.PRIMARY_MODEL, modelName);
+            renderAvailableModelsInSettings(models);
+            showToast(`優先モデルを ${modelName} に設定しました`);
+          });
+          els.availableModelsList.appendChild(chip);
+        });
+      }
+
+      // ==========================================
+      // UI レンダリング
+      // ==========================================
+      function updateApiKeyUI() {
+        const hasKey = Boolean(state.apiKey.trim());
+        els.apiKeyDot.classList.toggle('hidden', hasKey);
+        els.apiKeyAlert.classList.toggle('hidden', hasKey);
+      }
+
+      function updateStyleQuickUI() {
+        const hasProfile = Boolean(state.styleProfile.trim());
+        const active = hasProfile && state.styleEnabled;
+
+        if (!hasProfile) {
+          els.styleQuickToggle.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-500 text-[11px] font-semibold transition active:scale-95';
+          els.styleQuickDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+          els.styleQuickLabel.textContent = '自分の文体：未登録';
+        } else if (active) {
+          els.styleQuickToggle.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-brand-500/40 bg-brand-50 text-brand-800 text-[11px] font-semibold transition active:scale-95';
+          els.styleQuickDot.className = 'w-2 h-2 rounded-full bg-brand-600';
+          els.styleQuickLabel.textContent = '自分の文体：ON';
+        } else {
+          els.styleQuickToggle.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-[11px] font-semibold transition active:scale-95';
+          els.styleQuickDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+          els.styleQuickLabel.textContent = '自分の文体：OFF';
+        }
+
+        els.useStyleProfileToggle.checked = state.styleEnabled;
+      }
+
+      function renderChips() {
+        els.recipientChips.innerHTML = '';
+        RECIPIENT_OPTIONS.forEach((opt) => {
+          const selected = state.recipient === opt;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = opt;
+          btn.className = selected
+            ? 'px-3 py-1.5 rounded-full text-xs font-bold bg-brand-700 text-white shadow-xs transition active:scale-95'
+            : 'px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition active:scale-95';
+          btn.addEventListener('click', () => {
+            state.recipient = opt;
+            if (opt === 'ビジネス・Slack') {
+              state.bubbleMode = 'single';
+              updateBubbleModeUI();
+            }
+            renderChips();
+          });
+          els.recipientChips.appendChild(btn);
         });
 
-        const promptText = rawText
-          ? `以下の画像およびテキストから予定を抽出してください。\n\n【入力テキスト / 補足指示】\n${rawText}`
-          : '添付されたスクリーンショット画像から予定をすべて抽出してください。';
-        userParts.push({ text: promptText });
+        els.situationChips.innerHTML = '';
+        SITUATION_OPTIONS.forEach((opt) => {
+          const selected = state.situation === opt;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = opt;
+          btn.className = selected
+            ? 'px-3 py-1.5 rounded-full text-xs font-bold bg-slate-800 text-white shadow-xs transition active:scale-95'
+            : 'px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition active:scale-95';
+          btn.addEventListener('click', () => {
+            state.situation = opt;
+            renderChips();
+          });
+          els.situationChips.appendChild(btn);
+        });
+      }
 
-        const payload = {
+      function updateBubbleModeUI() {
+        els.bubbleModeBtns.forEach((btn) => {
+          const isSelected = btn.dataset.bubbleMode === state.bubbleMode;
+          if (isSelected) {
+            btn.className = 'bubble-mode-btn py-2 px-2.5 rounded-lg text-xs font-bold transition text-center bg-white text-brand-800 shadow-xs';
+          } else {
+            btn.className = 'bubble-mode-btn py-2 px-2.5 rounded-lg text-xs font-semibold transition text-center text-slate-500 hover:text-slate-700';
+          }
+        });
+      }
+
+      function renderChatImagePreviews() {
+        const count = state.chatImages.length;
+        els.imagePreviewContainer.classList.toggle('hidden', count === 0);
+        if (count === 0) return;
+
+        els.imageCountLabel.textContent = `読み込み済み画像（${count}枚）${state.privacyMask ? '・上部黒塗り済' : '・黒塗りOFF'}`;
+        els.imagePreviewList.innerHTML = '';
+
+        state.chatImages.forEach((item, idx) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'relative shrink-0 w-24 h-36 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group';
+
+          const img = document.createElement('img');
+          img.src = item.processedDataUrl;
+          img.alt = `トーク画面プレビュー ${idx + 1}`;
+          img.className = 'w-full h-full object-cover cursor-pointer';
+          img.addEventListener('click', () => {
+            els.lightboxImg.src = item.processedDataUrl;
+            els.lightboxCaption.textContent = `送信前プレビュー ${idx + 1}枚目（${state.privacyMask ? '上部12%黒塗り済' : '黒塗りなし'}）`;
+            els.lightboxModal.classList.remove('hidden');
+          });
+
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.setAttribute('aria-label', '画像を削除');
+          removeBtn.className = 'absolute top-1 right-1 w-6 h-6 rounded-full bg-slate-900/75 text-white flex items-center justify-center text-xs active:scale-90 transition';
+          removeBtn.innerHTML = '&times;';
+          removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.chatImages = state.chatImages.filter((x) => x.id !== item.id);
+            renderChatImagePreviews();
+          });
+
+          const indexBadge = document.createElement('span');
+          indexBadge.className = 'absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-slate-900/70 text-white text-[10px] font-bold';
+          indexBadge.textContent = `${idx + 1}`;
+
+          wrap.appendChild(img);
+          wrap.appendChild(removeBtn);
+          wrap.appendChild(indexBadge);
+          els.imagePreviewList.appendChild(wrap);
+        });
+      }
+
+      async function addChatImageFiles(files) {
+        const validFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+        if (validFiles.length === 0) return;
+
+        for (const file of validFiles) {
+          if (state.chatImages.length >= 6) {
+            showToast('画像は最大6枚まで読み込めます');
+            break;
+          }
+          try {
+            const img = await loadFileToImage(file);
+            const processed = processImageOnCanvas(img, state.privacyMask);
+            state.chatImages.push({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              imgElement: img,
+              processedDataUrl: processed.dataUrl,
+              base64: processed.base64,
+            });
+          } catch (err) {
+            showToast(err.message || '画像を読み込めませんでした');
+          }
+        }
+        renderChatImagePreviews();
+      }
+
+      function reprocessAllChatImages() {
+        state.chatImages.forEach((item) => {
+          const processed = processImageOnCanvas(item.imgElement, state.privacyMask);
+          item.processedDataUrl = processed.dataUrl;
+          item.base64 = processed.base64;
+        });
+        renderChatImagePreviews();
+      }
+
+      // ==========================================
+      // Gemini API 通信（高速化思考設定＋タイムアウト切替＋Structured Outputs）
+      // ==========================================
+      async function requestSingleModel({
+        modelName,
+        apiKey,
+        systemInstruction,
+        parts,
+        responseSchema,
+        temperature,
+        timeoutMs,
+        useThinkingConfig = true,
+      }) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`;
+
+        const generationConfig = {
+          temperature,
+          responseMimeType: 'application/json',
+          responseSchema,
+        };
+
+        const thinkingConfig = useThinkingConfig ? buildThinkingConfig(modelName) : null;
+        if (thinkingConfig) {
+          generationConfig.thinkingConfig = thinkingConfig;
+        }
+
+        const body = {
           systemInstruction: {
-            parts: [{ text: buildRelativeDateReferencePrompt() }]
+            parts: [{ text: systemInstruction }],
           },
           contents: [
             {
               role: 'user',
-              parts: userParts
-            }
+              parts,
+            },
           ],
-          generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-            responseSchema: SCHEDULE_RESPONSE_SCHEMA
-          }
+          generationConfig,
         };
 
-        const { bodyJson: resultJson, usedModel, switched } = await requestGeminiWithFallback(model, apiKey, payload);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-        const textOutput = resultJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!textOutput) {
-          throw new Error('AIから有効な応答が得られませんでした');
+        let res;
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey,
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+        } catch (fetchErr) {
+          clearTimeout(timer);
+          if (fetchErr.name === 'AbortError') {
+            const err = new Error(`応答が${Math.round(timeoutMs / 1000)}秒を超えたためタイムアウトしました`);
+            err.status = 408;
+            err.retryable = true;
+            throw err;
+          }
+          const err = new Error('ネットワーク通信エラーが発生しました');
+          err.retryable = true;
+          throw err;
+        }
+        clearTimeout(timer);
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          const apiMsg = data?.error?.message || `HTTP ${res.status}`;
+          const lowerMsg = apiMsg.toLowerCase();
+
+          // thinkingConfig 非対応モデルで400が出た場合は、thinkingConfigを外して同モデルで即再試行
+          if (
+            res.status === 400 &&
+            useThinkingConfig &&
+            thinkingConfig &&
+            (lowerMsg.includes('thinking') || lowerMsg.includes('unknown name'))
+          ) {
+            return requestSingleModel({
+              modelName,
+              apiKey,
+              systemInstruction,
+              parts,
+              responseSchema,
+              temperature,
+              timeoutMs,
+              useThinkingConfig: false,
+            });
+          }
+
+          if ((res.status === 400 || res.status === 403) && (lowerMsg.includes('api key') || lowerMsg.includes('permission denied'))) {
+            const err = new Error('APIキーが無効です。設定画面で正しいGemini APIキーを確認してください。');
+            err.fatal = true;
+            throw err;
+          }
+
+          const err = new Error(apiMsg);
+          err.status = res.status;
+          err.retryable =
+            res.status === 503 ||
+            res.status === 429 ||
+            res.status === 500 ||
+            res.status === 504 ||
+            res.status === 404 ||
+            (res.status === 400 && (
+              lowerMsg.includes('no longer available') ||
+              lowerMsg.includes('not found') ||
+              lowerMsg.includes('not supported') ||
+              lowerMsg.includes('overloaded') ||
+              lowerMsg.includes('high demand')
+            ));
+          throw err;
         }
 
-        const parsed = JSON.parse(textOutput);
-        const rawEvents = Array.isArray(parsed.events) ? parsed.events : [];
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!text) {
+          const err = new Error('空の応答が返されました');
+          err.retryable = true;
+          throw err;
+        }
 
-        if (rawEvents.length === 0) {
-          showToast('予定が見つかりませんでした。別の画像やテキストでお試しください', 'info');
-        } else {
-          const normalizedEvents = rawEvents.map((ev) => {
-            const isAllDay = Boolean(ev.isAllDay);
-            const normalizedDT = ensureValidEndDateTime(
-              ev.startDate,
-              ev.startTime,
-              ev.endDate,
-              ev.endTime,
-              isAllDay
+        try {
+          return JSON.parse(text);
+        } catch {
+          const err = new Error('JSON解析エラー');
+          err.retryable = true;
+          throw err;
+        }
+      }
+
+      async function callGeminiAPI({ systemInstruction, parts, responseSchema, temperature = 0.75, onStatusUpdate }) {
+        const apiKey = state.apiKey.trim();
+        if (!apiKey) {
+          openSettingsModal();
+          throw new Error('Gemini APIキーが設定されていません。設定画面からキーを保存してください。');
+        }
+
+        const startedAt = performance.now();
+        const triedModels = new Set();
+        let queue = buildModelCandidateQueue();
+        let hasFetchedLiveModels = false;
+        const errorLog = [];
+
+        while (true) {
+          const remaining = queue.filter((m) => !triedModels.has(m));
+          const nextModel = remaining[0];
+
+          if (!nextModel) {
+            if (state.autoFallback && !hasFetchedLiveModels) {
+              hasFetchedLiveModels = true;
+              if (onStatusUpdate) {
+                onStatusUpdate('空きモデルを検索中...', 'お使いのキーで利用可能な別モデルを確認しています');
+              }
+              const liveModels = await discoverAvailableModels(true);
+              liveModels.forEach((m) => {
+                if (!queue.includes(m)) queue.push(m);
+              });
+              const discoveredNext = queue.find((m) => !triedModels.has(m));
+              if (discoveredNext) continue;
+            }
+            break;
+          }
+
+          triedModels.add(nextModel);
+
+          // 次の候補があるうちは8秒で素早く見切る。最後の1候補または自動切替OFF時は18秒待機。
+          const hasMoreCandidates = state.autoFallback && (remaining.length > 1 || !hasFetchedLiveModels);
+          const timeoutMs = hasMoreCandidates ? FAST_FAILOVER_TIMEOUT_MS : FINAL_ATTEMPT_TIMEOUT_MS;
+
+          if (triedModels.size > 1 && onStatusUpdate) {
+            onStatusUpdate(
+              `混雑のため別モデルへ自動切替中...`,
+              `現在試行中: ${nextModel}（${triedModels.size}番目）`
             );
-            return {
-              id: 'ev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-              title: ev.title || '無題の予定',
-              startDate: normalizedDT.startDate,
-              startTime: normalizedDT.startTime,
-              endDate: normalizedDT.endDate,
-              endTime: normalizedDT.endTime,
-              isAllDay,
-              location: ev.location || '',
-              url: ev.url || '',
-              description: ev.description || ''
-            };
+          } else if (onStatusUpdate) {
+            onStatusUpdate(
+              null,
+              `使用モデル: ${nextModel}${state.fastMode ? '（高速モード）' : ''}`
+            );
+          }
+
+          try {
+            const parsed = await requestSingleModel({
+              modelName: nextModel,
+              apiKey,
+              systemInstruction,
+              parts,
+              responseSchema,
+              temperature,
+              timeoutMs,
+            });
+
+            const elapsedSec = ((performance.now() - startedAt) / 1000).toFixed(1);
+            state.lastUsedModel = nextModel;
+            state.lastElapsedSec = elapsedSec;
+            // 成功したモデルを記憶し、次回以降の空振り待ちを解消
+            if (state.autoFallback) {
+              state.lastFastSuccessModel = nextModel;
+            }
+
+            if (triedModels.size > 1) {
+              showToast(`混雑回避のため ${nextModel} に切替しました（${elapsedSec}秒）`);
+            }
+            return { data: parsed, usedModel: nextModel, switched: triedModels.size > 1, elapsedSec };
+          } catch (err) {
+            if (err.fatal) throw err;
+            errorLog.push(`${nextModel}: ${err.status || ''} ${err.message}`);
+
+            // 記憶していたモデルが今回コケたらクリア
+            if (state.lastFastSuccessModel === nextModel) {
+              state.lastFastSuccessModel = '';
+            }
+
+            if (!state.autoFallback || !err.retryable) {
+              if (err.status === 503 || err.status === 408) {
+                throw new Error(`${nextModel} が混雑しています。設定画面で「混雑時のモデル自動切替」をONにするか、少し待ってお試しください。`);
+              }
+              if (err.status === 429) {
+                throw new Error(`${nextModel} のリクエスト上限に達しました（429）。少し時間をおいてお試しください。`);
+              }
+              throw new Error(`APIエラー (${nextModel}): ${err.message}`);
+            }
+
+            // 初回失敗時に実在モデル一覧を補完しておく
+            if (!hasFetchedLiveModels) {
+              hasFetchedLiveModels = true;
+              const liveModels = await discoverAvailableModels(false);
+              const remainingStatic = queue.filter((m) => !triedModels.has(m));
+              const merged = [...Array.from(triedModels)];
+              liveModels.forEach((m) => {
+                if (!merged.includes(m)) merged.push(m);
+              });
+              remainingStatic.forEach((m) => {
+                if (!merged.includes(m)) merged.push(m);
+              });
+              queue = merged;
+            }
+          }
+        }
+
+        throw new Error(
+          `試したすべてのモデル（${triedModels.size}件）が混雑または利用不可でした。数十秒ほど待ってから再度お試しください。\n[詳細] ${errorLog.slice(0, 3).join(' / ')}`
+        );
+      }
+
+      // 4パターン生成用スキーマ
+      const FULL_RESPONSE_SCHEMA = {
+        type: 'OBJECT',
+        properties: {
+          airReadingMemo: {
+            type: 'STRING',
+            description: '相手の現在の温度感、隠れた意図、避けるべき地雷を2行以内で簡潔に解説したメモ',
+          },
+          patterns: {
+            type: 'ARRAY',
+            description: '切り口の異なる4つの返信案。必ず「王道・無難案」「短文・あっさり案」「やわらか・好印象案」「本音オブラート案」の順に4つ出力する',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                id: { type: 'STRING', description: 'p1, p2, p3, p4 のいずれか' },
+                type: { type: 'STRING', description: '王道・無難案 / 短文・あっさり案 / やわらか・好印象案 / 本音オブラート案' },
+                summary: { type: 'STRING', description: 'この案の狙いを15文字程度で簡潔に' },
+                messages: {
+                  type: 'ARRAY',
+                  items: { type: 'STRING' },
+                  description: '実際のトーク画面で送る吹き出しごとのメッセージ配列（1〜3通）',
+                },
+                stampAdvice: {
+                  type: 'STRING',
+                  description: 'この後に送ると角が取れるスタンプのテイスト（例：ゆるくペコリ系）を1行で',
+                },
+              },
+              required: ['id', 'type', 'summary', 'messages', 'stampAdvice'],
+            },
+          },
+        },
+        required: ['airReadingMemo', 'patterns'],
+      };
+
+      // 1カード個別リテイク用スキーマ
+      const SINGLE_PATTERN_SCHEMA = {
+        type: 'OBJECT',
+        properties: {
+          summary: { type: 'STRING', description: '微調整後の狙いを15文字程度で簡潔に' },
+          messages: {
+            type: 'ARRAY',
+            items: { type: 'STRING' },
+            description: '微調整後の吹き出しごとのメッセージ配列（1〜3通）',
+          },
+          stampAdvice: {
+            type: 'STRING',
+            description: 'この後に送ると角が取れるスタンプのテイストを1行で',
+          },
+        },
+        required: ['summary', 'messages', 'stampAdvice'],
+      };
+
+      // 文体解析用スキーマ
+      const STYLE_PROFILE_SCHEMA = {
+        type: 'OBJECT',
+        properties: {
+          profileText: {
+            type: 'STRING',
+            description: 'ユーザーの文体の癖を箇条書き5〜6行で要約したテキスト',
+          },
+        },
+        required: ['profileText'],
+      };
+
+      function buildSystemPrompt() {
+        const useStyle = state.styleEnabled && state.styleProfile.trim().length > 0;
+
+        return `あなたは日本人のLINE・Slackコミュニケーションに精通した代筆プロです。
+チャット画面のスクショやテキストから文脈・人間関係を読み取り、「絶対にAIっぽくない、人間らしい自然な返信案」を作成します。
+
+【AIっぽさ徹底排除ルール】
+- 「承知いたしました」「ご配慮いただきありがとうございます」「何かございましたらお気軽にご連絡ください」などの定型AI敬語は、ビジネス・Slack以外で絶対禁止。
+- 相手の言葉をわざとらしくオウム返ししない。言い訳は長々と書かず自然にぼかす。
+- 「😊✨🙏」のようなテンプレ絵文字を全案で機械的に連発せず、相手属性と文体に合わせる。
+- LINE等の画面は通常「左＝相手」「右＝ユーザー本人」。最新発言への返信を作成する。
+
+【吹き出し分割ルール】
+- 「2〜3通の連投を優先」：LINEらしいリズムでmessages配列を2〜3要素（短文案は1〜2要素）に分割。
+- 「1通にまとめる」：messages配列は基本1要素（必要なら文中で改行）。
+
+【4パターンの定義（この順序固定）】
+1. 王道・無難案：誰が読んでも角が立たない安全な返信
+2. 短文・あっさり案：ラリーを長引かせずスマートに終わらせる短文
+3. やわらか・好印象案：気遣いや温かみを添えた返信
+4. 本音オブラート案：本音・断り・要望をやんわり包んで伝える案（本音メモが空でも自分のペースを守る返信）
+
+${useStyle ? `【最優先：ユーザー本人の文体プロファイル】
+以下の語尾・句読点・絵文字量・改行リズムを忠実に再現すること（上司・ビジネス・Slack時は礼儀を保つ）：
+---
+${state.styleProfile.trim()}
+---` : ''}`;
+      }
+
+      function buildUserContextParts(extraInstruction = '') {
+        const parts = [];
+
+        state.chatImages.forEach((item) => {
+          parts.push({
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: item.base64,
+            },
+          });
+        });
+
+        const bubbleLabel = state.bubbleMode === 'split'
+          ? '2〜3通の連投（短い吹き出し分割）を優先'
+          : '1通にまとめる';
+
+        const chatText = els.chatTextInput.value.trim();
+        const honne = els.honneMemoInput.value.trim();
+
+        let promptText = `【条件】
+- 相手属性：${state.recipient}
+- 状況：${state.situation}
+- 吹き出し：${bubbleLabel}
+- 本音・補足：${honne || 'なし'}
+`;
+
+        if (chatText) {
+          promptText += `\n【トーク本文】\n${chatText}\n`;
+        }
+
+        if (extraInstruction) {
+          promptText += `\n【追加調整指示】\n${extraInstruction}\n`;
+        }
+
+        promptText += `\nJSONスキーマ通りに「空気読みメモ（2行以内）」と「4パターンの返信案」を簡潔かつ自然に出力してください。`;
+
+        parts.push({ text: promptText });
+        return parts;
+      }
+
+      // ==========================================
+      // 生成 & リテイク処理
+      // ==========================================
+      function setLoading(isLoading, message = '空気を読んで返信案を作成中...', subMessage = '') {
+        state.isGenerating = isLoading;
+        els.generateBtn.disabled = isLoading;
+        if (message) els.loadingMessage.textContent = message;
+        if (subMessage) els.loadingSubMessage.textContent = subMessage;
+        els.loadingSection.classList.toggle('hidden', !isLoading);
+        if (isLoading) {
+          els.errorSection.classList.add('hidden');
+        }
+      }
+
+      function showError(msg) {
+        els.errorText.textContent = msg;
+        els.errorSection.classList.remove('hidden');
+      }
+
+      async function generateReplies(globalRetakeInstruction = '') {
+        if (state.isGenerating) return;
+
+        const hasInput = state.chatImages.length > 0 || els.chatTextInput.value.trim().length > 0;
+        if (!hasInput) {
+          showToast('スクショを読み込むか、トーク本文を入力してください');
+          return;
+        }
+
+        const firstModel = (state.autoFallback && state.lastFastSuccessModel)
+          ? state.lastFastSuccessModel
+          : state.primaryModel;
+
+        setLoading(
+          true,
+          globalRetakeInstruction
+            ? `「${globalRetakeInstruction}」方向で4案を調整中...`
+            : '空気を読んで返信案を作成中...',
+          `使用モデル: ${firstModel}${state.fastMode ? '（高速モード）' : ''}`
+        );
+
+        try {
+          let extra = '';
+          if (globalRetakeInstruction && state.lastResult) {
+            extra = `前回の生成結果をベースに、4パターンすべてを「${globalRetakeInstruction}」方向へ調整してください。\n前回の案：${JSON.stringify(state.lastResult.patterns)}`;
+          }
+
+          const { data: result, usedModel, switched, elapsedSec } = await callGeminiAPI({
+            systemInstruction: buildSystemPrompt(),
+            parts: buildUserContextParts(extra),
+            responseSchema: FULL_RESPONSE_SCHEMA,
+            onStatusUpdate: (mainMsg, subMsg) => {
+              if (mainMsg) els.loadingMessage.textContent = mainMsg;
+              if (subMsg) els.loadingSubMessage.textContent = subMsg;
+            },
           });
 
-          extractedEvents = [...normalizedEvents, ...extractedEvents];
-          renderEventCards();
-          const suffix = switched ? `（${usedModel} へ自動切替）` : '';
-          showToast(`${normalizedEvents.length}件の予定を抽出しました！${suffix}`, 'success');
-          document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          if (!result || !Array.isArray(result.patterns) || result.patterns.length === 0) {
+            throw new Error('返信案を取得できませんでした。再度お試しください。');
+          }
+
+          state.lastResult = result;
+          renderResults(result, usedModel, switched, elapsedSec);
+          els.resultSection.classList.remove('hidden');
+
+          setTimeout(() => {
+            els.resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 80);
+        } catch (err) {
+          showError(err.message || '予期しないエラーが発生しました');
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        console.error(err);
-        showToast(`抽出エラー: ${err.message}`, 'error');
-      } finally {
-        analyzeBtn.disabled = false;
-        loadingSection.classList.add('hidden');
       }
-    }
 
-    analyzeBtn.addEventListener('click', analyzeScheduleWithGemini);
+      async function retakeSinglePattern(patternIndex, instruction, cardEl) {
+        if (!state.lastResult || !state.lastResult.patterns[patternIndex]) return;
 
-    /**************************************************************
-     * 4. 抽出された予定カードのレンダリング・編集UI
-     **************************************************************/
-    function escapeHtml(str) {
-      return String(str ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
+        const target = state.lastResult.patterns[patternIndex];
+        const overlay = cardEl.querySelector('.card-loading-overlay');
+        const overlayLabel = cardEl.querySelector('.card-loading-label');
+        if (overlay) overlay.classList.remove('hidden');
 
-    function getWeekdayLabelFromDateStr(dateStr) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return '';
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const dt = new Date(y, m - 1, d);
-      return `(${WEEKDAYS_SHORT_JP[dt.getDay()]})`;
-    }
+        try {
+          const extra = `現在生成済みの「${target.type}」の返信案だけを、文脈と相手属性を保ったまま「${instruction}」方向へリテイクしてください。
+元の案：${JSON.stringify(target.messages)}
+元の狙い：${target.summary}`;
 
-    function renderEventCards() {
-      eventCountBadge.textContent = `${extractedEvents.length}件`;
-      emptyStateBox.classList.toggle('hidden', extractedEvents.length > 0);
-      downloadAllIcsBtn.classList.toggle('hidden', extractedEvents.length < 2);
-      eventsListContainer.innerHTML = '';
+          const { data: updated, usedModel, switched, elapsedSec } = await callGeminiAPI({
+            systemInstruction: buildSystemPrompt(),
+            parts: buildUserContextParts(extra),
+            responseSchema: SINGLE_PATTERN_SCHEMA,
+            temperature: 0.7,
+            onStatusUpdate: (mainMsg) => {
+              if (mainMsg && overlayLabel) overlayLabel.textContent = mainMsg;
+            },
+          });
 
-      extractedEvents.forEach((ev, idx) => {
-        const card = document.createElement('article');
-        card.className = 'bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden animate-fade-in';
-        const startWeekday = getWeekdayLabelFromDateStr(ev.startDate);
-        const endWeekday = getWeekdayLabelFromDateStr(ev.endDate);
+          state.lastResult.patterns[patternIndex] = {
+            ...target,
+            summary: updated.summary || target.summary,
+            messages: Array.isArray(updated.messages) && updated.messages.length ? updated.messages : target.messages,
+            stampAdvice: updated.stampAdvice || target.stampAdvice,
+          };
 
-        card.innerHTML = `
-          <div class="bg-slate-50/80 px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded-md bg-brand-600 text-white text-[10px] font-bold">予定 #${idx + 1}</span>
-              <span class="text-xs font-semibold text-slate-600">${escapeHtml(ev.startDate)} ${startWeekday}</span>
-            </div>
-            <div class="flex items-center gap-3">
-              <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                <input type="checkbox" data-field="isAllDay" ${ev.isAllDay ? 'checked' : ''} class="w-3.5 h-3.5 rounded text-brand-600 focus:ring-brand-500" />
-                <span class="text-xs font-semibold text-slate-600">終日</span>
-              </label>
-              <button type="button" class="delete-card-btn text-slate-400 hover:text-rose-600 p-1 transition" title="この予定を削除">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          renderResults(state.lastResult, usedModel, switched, elapsedSec);
+          showToast(`「${target.type}」を調整しました（${elapsedSec}秒）`);
+        } catch (err) {
+          showToast(err.message || '調整に失敗しました');
+        } finally {
+          if (overlay) overlay.classList.add('hidden');
+        }
+      }
 
-          <div class="p-4 space-y-3">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-500 mb-1">タイトル</label>
-              <input
-                type="text"
-                data-field="title"
-                value="${escapeHtml(ev.title)}"
-                placeholder="予定のタイトル"
-                class="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 text-sm font-bold text-slate-900 focus:bg-white focus:border-brand-500 outline-none"
-              />
-            </div>
+      function renderResults(data, usedModel = state.lastUsedModel, switched = false, elapsedSec = state.lastElapsedSec) {
+        els.airReadingMemoText.textContent = data.airReadingMemo || '';
+        const timePart = elapsedSec ? ` · ${elapsedSec}秒` : '';
+        els.usedModelBadge.textContent = usedModel
+          ? `${switched ? '切替:' : ''}${usedModel}${timePart}`
+          : '';
+        els.patternsContainer.innerHTML = '';
 
-            <div class="grid grid-cols-2 gap-2.5">
-              <div class="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <span class="text-[11px] font-bold text-slate-500">開始</span>
-                  <span class="start-weekday-label text-[11px] font-bold text-brand-600">${startWeekday}</span>
-                </div>
-                <input
-                  type="date"
-                  data-field="startDate"
-                  value="${escapeHtml(ev.startDate)}"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-brand-500"
-                />
-                <input
-                  type="time"
-                  data-field="startTime"
-                  value="${escapeHtml(ev.startTime)}"
-                  ${ev.isAllDay ? 'disabled' : ''}
-                  class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-brand-500 disabled:opacity-40 disabled:bg-slate-100"
-                />
-              </div>
+        data.patterns.forEach((pattern, index) => {
+          const styleMeta = PATTERN_BADGES[index % PATTERN_BADGES.length];
+          const messages = Array.isArray(pattern.messages) && pattern.messages.length > 0
+            ? pattern.messages
+            : [''];
 
-              <div class="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/70 space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <span class="text-[11px] font-bold text-slate-500">終了</span>
-                  <span class="end-weekday-label text-[11px] font-bold text-brand-600">${endWeekday}</span>
-                </div>
-                <input
-                  type="date"
-                  data-field="endDate"
-                  value="${escapeHtml(ev.endDate)}"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-brand-500"
-                />
-                <input
-                  type="time"
-                  data-field="endTime"
-                  value="${escapeHtml(ev.endTime)}"
-                  ${ev.isAllDay ? 'disabled' : ''}
-                  class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 outline-none focus:border-brand-500 disabled:opacity-40 disabled:bg-slate-100"
-                />
-              </div>
-            </div>
+          const card = document.createElement('article');
+          card.className = 'relative bg-white rounded-2xl shadow-sm border border-slate-200/85 overflow-hidden';
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <label class="text-[11px] font-bold text-slate-500">場所（店名・住所・駅など）</label>
-                  <button type="button" class="open-map-btn text-[11px] font-semibold text-brand-600 hover:underline ${ev.location ? '' : 'hidden'}">地図で確認</button>
-                </div>
-                <input
-                  type="text"
-                  data-field="location"
-                  value="${escapeHtml(ev.location)}"
-                  placeholder="例：渋谷駅 ハチ公前 / 焼肉〇〇"
-                  class="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
-                />
-              </div>
+          const overlay = document.createElement('div');
+          overlay.className = 'card-loading-overlay hidden absolute inset-0 z-10 bg-white/80 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 px-4 text-center';
+          overlay.innerHTML = `
+            <svg class="w-6 h-6 text-brand-700 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="card-loading-label text-xs font-bold text-slate-700">この案を微調整中...</span>
+          `;
+          card.appendChild(overlay);
 
-              <div>
-                <label class="block text-[11px] font-bold text-slate-500 mb-1">URL</label>
-                <input
-                  type="url"
-                  data-field="url"
-                  value="${escapeHtml(ev.url)}"
-                  placeholder="https://..."
-                  class="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:border-brand-500 outline-none"
-                />
-              </div>
-            </div>
+          const header = document.createElement('div');
+          header.className = 'px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2';
 
-            <div>
-              <label class="block text-[11px] font-bold text-slate-500 mb-1">メモ（同伴者・持ち物・予約番号など）</label>
-              <textarea
-                rows="2"
-                data-field="description"
-                placeholder="予約番号や同伴者などの補足メモ"
-                class="w-full rounded-xl border border-slate-200 bg-slate-50/40 px-3 py-2 text-xs text-slate-800 focus:bg-white focus:border-brand-500 outline-none resize-none"
-              >${escapeHtml(ev.description)}</textarea>
-            </div>
+          const titleWrap = document.createElement('div');
+          titleWrap.className = 'flex items-center gap-2 min-w-0';
 
-            <div class="pt-1 grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                class="google-cal-btn py-2.5 px-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 active:scale-95 transition"
-              >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                <span>Googleカレンダー</span>
-              </button>
+          const badge = document.createElement('span');
+          badge.className = `shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${styleMeta.bg} ${styleMeta.text} ${styleMeta.accent}`;
+          badge.textContent = `${index + 1}. ${pattern.type}`;
 
-              <button
-                type="button"
-                class="apple-ics-btn py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 active:scale-95 transition"
-              >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>iPhone等の標準暦(.ics)</span>
-              </button>
-            </div>
-          </div>
+          const summary = document.createElement('span');
+          summary.className = 'text-[11px] text-slate-500 truncate';
+          summary.textContent = pattern.summary || '';
+
+          titleWrap.appendChild(badge);
+          titleWrap.appendChild(summary);
+
+          const copyAllBtn = document.createElement('button');
+          copyAllBtn.type = 'button';
+          copyAllBtn.className = 'shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-[11px] font-bold transition';
+          copyAllBtn.innerHTML = `
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>まとめてコピー</span>
+          `;
+          copyAllBtn.addEventListener('click', () => {
+            copyToClipboard(messages.join('\n'), `「${pattern.type}」をまとめてコピーしました`);
+          });
+
+          header.appendChild(titleWrap);
+          header.appendChild(copyAllBtn);
+          card.appendChild(header);
+
+          const chatArea = document.createElement('div');
+          chatArea.className = 'bg-linebg px-3.5 py-3.5 space-y-2.5';
+
+          messages.forEach((msgText, msgIdx) => {
+            const row = document.createElement('div');
+            row.className = 'flex items-end justify-end gap-2';
+
+            const singleCopyBtn = document.createElement('button');
+            singleCopyBtn.type = 'button';
+            singleCopyBtn.className = 'shrink-0 px-2 py-1 rounded-lg bg-white/90 hover:bg-white border border-slate-200/90 text-[10px] font-bold text-slate-600 active:scale-95 transition shadow-2xs';
+            singleCopyBtn.textContent = messages.length > 1 ? `${msgIdx + 1}通目コピー` : 'コピー';
+            singleCopyBtn.addEventListener('click', () => {
+              copyToClipboard(msgText, messages.length > 1 ? `${msgIdx + 1}通目をコピーしました` : 'コピーしました');
+            });
+
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble max-w-[82%] bg-linebubble border border-linebubbleborder px-3.5 py-2.5 text-[14px] leading-relaxed text-slate-800 whitespace-pre-wrap break-words shadow-2xs cursor-pointer active:opacity-80 transition';
+            bubble.textContent = msgText;
+            bubble.title = 'タップしてコピー';
+            bubble.addEventListener('click', () => {
+              copyToClipboard(msgText, messages.length > 1 ? `${msgIdx + 1}通目をコピーしました` : 'コピーしました');
+            });
+
+            row.appendChild(singleCopyBtn);
+            row.appendChild(bubble);
+            chatArea.appendChild(row);
+          });
+
+          card.appendChild(chatArea);
+
+          const footer = document.createElement('div');
+          footer.className = 'px-4 py-3 bg-white space-y-2.5';
+
+          const stampRow = document.createElement('div');
+          stampRow.className = 'flex items-start gap-1.5 text-[11px] text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-100';
+          stampRow.innerHTML = `<span class="shrink-0 font-bold text-brand-700">スタンプ案:</span>`;
+          const stampSpan = document.createElement('span');
+          stampSpan.textContent = pattern.stampAdvice || 'ゆるくペコリ系';
+          stampRow.appendChild(stampSpan);
+          footer.appendChild(stampRow);
+
+          const retakeBar = document.createElement('div');
+          retakeBar.className = 'flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5';
+
+          const retakeOptions = [
+            { label: 'もう少し短く', instruction: 'もう少し短く' },
+            { label: 'もっとフランクに', instruction: 'もっとフランクに' },
+            { label: 'もっと丁寧に', instruction: 'もっと丁寧に' },
+            { label: '絵文字を減らす', instruction: '絵文字を減らす' },
+          ];
+
+          retakeOptions.forEach((opt) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'shrink-0 px-2.5 py-1 rounded-full border border-slate-200 bg-white hover:bg-brand-50 hover:border-brand-300 text-[11px] font-semibold text-slate-600 active:scale-95 transition';
+            btn.textContent = opt.label;
+            btn.addEventListener('click', () => retakeSinglePattern(index, opt.instruction, card));
+            retakeBar.appendChild(btn);
+          });
+
+          footer.appendChild(retakeBar);
+          card.appendChild(footer);
+
+          els.patternsContainer.appendChild(card);
+        });
+      }
+
+      // ==========================================
+      // 設定モーダル & 文体学習機能
+      // ==========================================
+      function openSettingsModal() {
+        els.apiKeyInput.value = state.apiKey;
+        els.primaryModelInput.value = state.primaryModel;
+        els.fastModeToggle.checked = state.fastMode;
+        els.autoFallbackToggle.checked = state.autoFallback;
+        els.styleProfileTextarea.value = state.styleProfile;
+        els.useStyleProfileToggle.checked = state.styleEnabled;
+        if (state.discoveredModels.length > 0) {
+          renderAvailableModelsInSettings(state.discoveredModels);
+        }
+        els.settingsModal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeSettingsModal() {
+        els.settingsModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+
+      function renderStyleImagePreviews() {
+        const list = state.styleImages;
+        els.styleImagePreviewList.classList.toggle('hidden', list.length === 0);
+        els.analyzeStyleBtn.disabled = list.length === 0;
+        els.styleImagePreviewList.innerHTML = '';
+
+        list.forEach((item, idx) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'relative shrink-0 w-16 h-24 rounded-lg overflow-hidden border border-slate-200';
+          const img = document.createElement('img');
+          img.src = item.processedDataUrl;
+          img.alt = `文体サンプル ${idx + 1}`;
+          img.className = 'w-full h-full object-cover';
+
+          const rm = document.createElement('button');
+          rm.type = 'button';
+          rm.className = 'absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-slate-900/75 text-white text-[10px] flex items-center justify-center';
+          rm.innerHTML = '&times;';
+          rm.addEventListener('click', () => {
+            state.styleImages = state.styleImages.filter((x) => x.id !== item.id);
+            renderStyleImagePreviews();
+          });
+
+          wrap.appendChild(img);
+          wrap.appendChild(rm);
+          els.styleImagePreviewList.appendChild(wrap);
+        });
+      }
+
+      async function analyzeUserStyle() {
+        if (state.styleImages.length === 0) return;
+
+        const inputKey = els.apiKeyInput.value.trim();
+        if (inputKey && inputKey !== state.apiKey) {
+          state.apiKey = inputKey;
+          localStorage.setItem(STORAGE_KEYS.API_KEY, inputKey);
+          updateApiKeyUI();
+        }
+
+        els.analyzeStyleBtn.disabled = true;
+        const originalText = els.analyzeStyleBtn.innerHTML;
+        els.analyzeStyleBtn.innerHTML = `
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span>文体を解析中...</span>
         `;
 
-        card.querySelectorAll('[data-field]').forEach((inputEl) => {
-          inputEl.addEventListener('change', (e) => {
-            const field = e.target.getAttribute('data-field');
-            if (field === 'isAllDay') {
-              ev.isAllDay = e.target.checked;
-              if (!ev.isAllDay && !ev.startTime) {
-                ev.startTime = '19:00';
-                const fixed = ensureValidEndDateTime(ev.startDate, ev.startTime, ev.endDate, ev.endTime, false);
-                ev.endDate = fixed.endDate;
-                ev.endTime = fixed.endTime;
-              }
-              renderEventCards();
-              return;
-            }
+        try {
+          const parts = state.styleImages.map((item) => ({
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: item.base64,
+            },
+          }));
 
-            ev[field] = e.target.value;
-
-            if (field === 'startDate' || field === 'startTime') {
-              const fixed = ensureValidEndDateTime(ev.startDate, ev.startTime, ev.endDate, ev.endTime, ev.isAllDay);
-              ev.endDate = fixed.endDate;
-              ev.endTime = fixed.endTime;
-              renderEventCards();
-            } else if (field === 'endDate') {
-              const endLabel = card.querySelector('.end-weekday-label');
-              if (endLabel) endLabel.textContent = getWeekdayLabelFromDateStr(ev.endDate);
-            } else if (field === 'location') {
-              const mapBtn = card.querySelector('.open-map-btn');
-              if (mapBtn) mapBtn.classList.toggle('hidden', !ev.location.trim());
-            }
+          parts.push({
+            text: `これらのチャット画面のスクリーンショットから、画面右側（ユーザー本人）のメッセージだけを分析し、本人の文体の癖を箇条書き5〜6行で言語化してください。
+必ず以下の観点を含めてください：
+1. 敬語/タメ口の度合いと語尾の癖
+2. 句読点（「、」「。」）の有無や使い方
+3. 「！」「？」「w」「笑」などの使用頻度
+4. 絵文字・顔文字の傾向（使う種類や量）
+5. 改行リズム・1通あたりの長さ・よく使う言い回し`,
           });
-        });
 
-        card.querySelector('.open-map-btn').addEventListener('click', () => {
-          if (!ev.location.trim()) return;
-          const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ev.location.trim())}`;
-          window.open(mapUrl, '_blank', 'noopener,noreferrer');
-        });
+          const { data: res } = await callGeminiAPI({
+            systemInstruction: 'あなたは文章スタイル分析の専門家です。チャットの右側（本人）の文章だけを見て、代筆AIが再現しやすいように具体的かつ簡潔な文体プロファイルを作成してください。個人名や固有名詞は含めないでください。',
+            parts,
+            responseSchema: STYLE_PROFILE_SCHEMA,
+            temperature: 0.3,
+          });
 
-        card.querySelector('.delete-card-btn').addEventListener('click', () => {
-          extractedEvents = extractedEvents.filter(item => item.id !== ev.id);
-          renderEventCards();
-        });
-
-        card.querySelector('.google-cal-btn').addEventListener('click', () => {
-          openGoogleCalendarUrl(ev);
-        });
-
-        card.querySelector('.apple-ics-btn').addEventListener('click', () => {
-          downloadIcsFile([ev], `${ev.title || 'schedule'}.ics`);
-        });
-
-        eventsListContainer.appendChild(card);
-      });
-    }
-
-    /**************************************************************
-     * 5. カレンダー登録処理（GoogleカレンダーURL / .ics動的生成）
-     **************************************************************/
-    function getNextDayCompact(dateStr) {
-      const [y, m, d] = dateStr.split('-').map(Number);
-      const next = new Date(y, m - 1, d + 1);
-      return formatDateYYYYMMDD(next, '');
-    }
-
-    function toCompactDateTime(dateStr, timeStr) {
-      const cleanDate = dateStr.replace(/-/g, '');
-      const cleanTime = (timeStr || '00:00').replace(':', '') + '00';
-      return `${cleanDate}T${cleanTime}`;
-    }
-
-    function openGoogleCalendarUrl(ev) {
-      const fixed = ensureValidEndDateTime(ev.startDate, ev.startTime, ev.endDate, ev.endTime, ev.isAllDay);
-      let datesParam = '';
-
-      if (ev.isAllDay) {
-        const startCompact = fixed.startDate.replace(/-/g, '');
-        const endExclusiveCompact = getNextDayCompact(fixed.endDate);
-        datesParam = `${startCompact}/${endExclusiveCompact}`;
-      } else {
-        const startDT = toCompactDateTime(fixed.startDate, fixed.startTime);
-        const endDT = toCompactDateTime(fixed.endDate, fixed.endTime);
-        datesParam = `${startDT}/${endDT}`;
+          if (res?.profileText) {
+            els.styleProfileTextarea.value = res.profileText;
+            state.styleProfile = res.profileText;
+            state.styleEnabled = true;
+            localStorage.setItem(STORAGE_KEYS.STYLE_PROFILE, state.styleProfile);
+            localStorage.setItem(STORAGE_KEYS.STYLE_ENABLED, 'true');
+            state.styleImages = [];
+            renderStyleImagePreviews();
+            updateStyleQuickUI();
+            showToast('文体を解析して保存しました！');
+          }
+        } catch (err) {
+          showToast(err.message || '文体解析に失敗しました');
+        } finally {
+          els.analyzeStyleBtn.innerHTML = originalText;
+          els.analyzeStyleBtn.disabled = state.styleImages.length === 0;
+        }
       }
 
-      const detailsParts = [];
-      if (ev.description && ev.description.trim()) {
-        detailsParts.push(ev.description.trim());
-      }
-      if (ev.url && ev.url.trim()) {
-        detailsParts.push(`関連URL: ${ev.url.trim()}`);
-      }
-
-      const params = new URLSearchParams({
-        action: 'TEMPLATE',
-        text: ev.title || '予定',
-        dates: datesParam,
-        details: detailsParts.join('\n\n'),
-        location: ev.location || '',
-        ctz: 'Asia/Tokyo'
+      // ==========================================
+      // イベントリスナー登録
+      // ==========================================
+      els.chatImageInput.addEventListener('change', async (e) => {
+        if (e.target.files?.length) {
+          await addChatImageFiles(e.target.files);
+          e.target.value = '';
+        }
       });
 
-      const url = `https://www.google.com/calendar/render?${params.toString()}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
+      els.privacyMaskToggle.addEventListener('change', (e) => {
+        state.privacyMask = e.target.checked;
+        reprocessAllChatImages();
+      });
 
-    function escapeIcsText(str) {
-      return String(str ?? '')
-        .replace(/\\/g, '\\\\')
-        .replace(/;/g, '\\;')
-        .replace(/,/g, '\\,')
-        .replace(/\r?\n/g, '\\n');
-    }
+      els.clearImagesBtn.addEventListener('click', () => {
+        state.chatImages = [];
+        renderChatImagePreviews();
+        showToast('画像をクリアしました');
+      });
 
-    function downloadIcsFile(eventsArray, filename = 'schedule.ics') {
-      const nowUtc = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      const lines = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//ScreenshotToCalendar//JP',
-        'CALSCALE:GREGORIAN',
-        'METHOD:PUBLISH'
-      ];
+      els.pasteClipboardBtn.addEventListener('click', async () => {
+        try {
+          if (!navigator.clipboard || !navigator.clipboard.read) {
+            throw new Error('unsupported');
+          }
+          const items = await navigator.clipboard.read();
+          let foundImage = false;
+          let foundText = false;
 
-      eventsArray.forEach((ev) => {
-        const fixed = ensureValidEndDateTime(ev.startDate, ev.startTime, ev.endDate, ev.endTime, ev.isAllDay);
-        lines.push('BEGIN:VEVENT');
-        lines.push(`UID:${ev.id}@screenshot-calendar.local`);
-        lines.push(`DTSTAMP:${nowUtc}`);
+          for (const item of items) {
+            const imageType = item.types.find((t) => t.startsWith('image/'));
+            if (imageType) {
+              const blob = await item.getType(imageType);
+              await addChatImageFiles([blob]);
+              foundImage = true;
+            } else if (item.types.includes('text/plain') && !foundImage) {
+              const blob = await item.getType('text/plain');
+              const text = await blob.text();
+              if (text.trim()) {
+                els.chatTextInput.value = els.chatTextInput.value
+                  ? `${els.chatTextInput.value}\n${text.trim()}`
+                  : text.trim();
+                foundText = true;
+              }
+            }
+          }
 
-        if (ev.isAllDay) {
-          const startCompact = fixed.startDate.replace(/-/g, '');
-          const endExclusiveCompact = getNextDayCompact(fixed.endDate);
-          lines.push(`DTSTART;VALUE=DATE:${startCompact}`);
-          lines.push(`DTEND;VALUE=DATE:${endExclusiveCompact}`);
+          if (foundImage) {
+            showToast('スクショを貼り付けました');
+          } else if (foundText) {
+            showToast('テキストを貼り付けました');
+          } else {
+            showToast('クリップボードに画像やテキストが見つかりませんでした');
+          }
+        } catch {
+          showToast('自動貼付非対応です。テキスト欄長押し、またはCmd/Ctrl+Vで貼り付けてください');
+        }
+      });
+
+      window.addEventListener('paste', async (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        const imageFiles = [];
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile();
+            if (file) imageFiles.push(file);
+          }
+        }
+
+        if (imageFiles.length > 0) {
+          e.preventDefault();
+          await addChatImageFiles(imageFiles);
+          showToast('クリップボードから画像を読み込みました');
+        }
+      });
+
+      els.bubbleModeBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.bubbleMode = btn.dataset.bubbleMode;
+          updateBubbleModeUI();
+        });
+      });
+
+      els.styleQuickToggle.addEventListener('click', () => {
+        if (!state.styleProfile.trim()) {
+          openSettingsModal();
+          return;
+        }
+        state.styleEnabled = !state.styleEnabled;
+        localStorage.setItem(STORAGE_KEYS.STYLE_ENABLED, String(state.styleEnabled));
+        updateStyleQuickUI();
+        showToast(state.styleEnabled ? '自分の文体を適用します' : '自分の文体をOFFにしました');
+      });
+
+      els.generateBtn.addEventListener('click', () => generateReplies());
+
+      els.globalRetakeBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          generateReplies(btn.dataset.globalRetake);
+        });
+      });
+
+      els.openSettingsBtn.addEventListener('click', openSettingsModal);
+      els.alertSettingsBtn.addEventListener('click', openSettingsModal);
+      els.closeSettingsBtn.addEventListener('click', closeSettingsModal);
+      els.settingsModal.addEventListener('click', (e) => {
+        if (e.target === els.settingsModal) closeSettingsModal();
+      });
+
+      els.toggleApiKeyVisibility.addEventListener('click', () => {
+        const isPwd = els.apiKeyInput.type === 'password';
+        els.apiKeyInput.type = isPwd ? 'text' : 'password';
+        els.toggleApiKeyVisibility.textContent = isPwd ? '隠す' : '表示';
+      });
+
+      els.saveApiKeyBtn.addEventListener('click', () => {
+        const val = els.apiKeyInput.value.trim();
+        state.apiKey = val;
+        state.discoveredModels = [];
+        state.lastFastSuccessModel = '';
+        if (val) {
+          localStorage.setItem(STORAGE_KEYS.API_KEY, val);
+          showToast('APIキーを保存しました');
         } else {
-          const startDT = toCompactDateTime(fixed.startDate, fixed.startTime);
-          const endDT = toCompactDateTime(fixed.endDate, fixed.endTime);
-          lines.push(`DTSTART;TZID=Asia/Tokyo:${startDT}`);
-          lines.push(`DTEND;TZID=Asia/Tokyo:${endDT}`);
+          localStorage.removeItem(STORAGE_KEYS.API_KEY);
+          showToast('APIキーを削除しました');
         }
-
-        lines.push(`SUMMARY:${escapeIcsText(ev.title || '予定')}`);
-
-        if (ev.location && ev.location.trim()) {
-          lines.push(`LOCATION:${escapeIcsText(ev.location.trim())}`);
-        }
-
-        const descParts = [];
-        if (ev.description && ev.description.trim()) {
-          descParts.push(ev.description.trim());
-        }
-        if (ev.url && ev.url.trim()) {
-          descParts.push(`URL: ${ev.url.trim()}`);
-          lines.push(`URL:${ev.url.trim()}`);
-        }
-        if (descParts.length > 0) {
-          lines.push(`DESCRIPTION:${escapeIcsText(descParts.join('\n\n'))}`);
-        }
-
-        lines.push('END:VEVENT');
+        updateApiKeyUI();
       });
 
-      lines.push('END:VCALENDAR');
-
-      const icsContent = lines.join('\r\n');
-      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-      const blobUrl = URL.createObjectURL(blob);
-
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename.endsWith('.ics') ? filename : `${filename}.ics`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
-
-      showToast('.icsファイルを生成しました', 'success');
-    }
-
-    downloadAllIcsBtn.addEventListener('click', () => {
-      if (extractedEvents.length === 0) return;
-      downloadIcsFile(extractedEvents, 'schedules_all.ics');
-    });
-
-    addEmptyCardBtn.addEventListener('click', () => {
-      const now = new Date();
-      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-      const dateStr = formatDateYYYYMMDD(tomorrow, '-');
-      extractedEvents.unshift({
-        id: 'ev_' + Date.now(),
-        title: '新しい予定',
-        startDate: dateStr,
-        startTime: '19:00',
-        endDate: dateStr,
-        endTime: '21:00',
-        isAllDay: false,
-        location: '',
-        url: '',
-        description: ''
+      els.fastModeToggle.addEventListener('change', (e) => {
+        state.fastMode = e.target.checked;
+        localStorage.setItem(STORAGE_KEYS.FAST_MODE, String(state.fastMode));
+        showToast(state.fastMode ? '高速応答モードをONにしました' : '高速応答モードをOFFにしました');
       });
-      renderEventCards();
-    });
 
-    loadDemoBtn.addEventListener('click', () => {
-      const now = new Date();
-      const daysUntilFri = (5 - now.getDay() + 7) % 7 || 7;
-      const nextFri = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilFri);
-      const nextSun = new Date(nextFri.getFullYear(), nextFri.getMonth(), nextFri.getDate() + 2);
+      els.autoFallbackToggle.addEventListener('change', (e) => {
+        state.autoFallback = e.target.checked;
+        localStorage.setItem(STORAGE_KEYS.AUTO_FALLBACK, String(state.autoFallback));
+        showToast(state.autoFallback ? '混雑時の自動切替をONにしました' : '混雑時の自動切替をOFFにしました');
+      });
 
-      const friStr = formatDateYYYYMMDD(nextFri, '-');
-      const sunStr = formatDateYYYYMMDD(nextSun, '-');
-
-      rawTextInput.value = `【LINEトーク履歴サンプル】\nお疲れ様！今度の金曜（${nextFri.getMonth() + 1}/${nextFri.getDate()}）19:30から恵比寿の「トラットリア・ベルデ」で歓迎会やります！予約番号は #R-8841、会費5,000円です。\nあと日曜日（${nextSun.getMonth() + 1}/${nextSun.getDate()}）の14:00〜16:00は渋谷スクランブルスクエア15Fでフットサル企画MTGお願いします！`;
-      clearTextBtn.classList.remove('hidden');
-
-      extractedEvents = [
-        {
-          id: 'demo_1_' + Date.now(),
-          title: '歓迎会（トラットリア・ベルデ）',
-          startDate: friStr,
-          startTime: '19:30',
-          endDate: friStr,
-          endTime: '21:30',
-          isAllDay: false,
-          location: 'トラットリア・ベルデ（恵比寿）',
-          url: 'https://example.com/reservation/R-8841',
-          description: '予約番号: #R-8841 / 会費: 5,000円（終了時刻未指定のため2時間後を自動設定）'
-        },
-        {
-          id: 'demo_2_' + Date.now(),
-          title: 'フットサル企画MTG',
-          startDate: sunStr,
-          startTime: '14:00',
-          endDate: sunStr,
-          endTime: '16:00',
-          isAllDay: false,
-          location: '渋谷スクランブルスクエア 15F',
-          url: '',
-          description: '持ち物: 企画案メモ'
+      els.saveModelBtn.addEventListener('click', () => {
+        const model = els.primaryModelInput.value.trim() || DEFAULT_PRIMARY_MODEL;
+        state.primaryModel = model;
+        state.lastFastSuccessModel = '';
+        els.primaryModelInput.value = model;
+        localStorage.setItem(STORAGE_KEYS.PRIMARY_MODEL, model);
+        if (state.discoveredModels.length > 0) {
+          renderAvailableModelsInSettings(state.discoveredModels);
         }
-      ];
+        showToast(`優先モデルを ${model} に保存しました`);
+      });
 
-      renderEventCards();
-      showToast('サンプル予定を2件読み込みました。下のカードからカレンダー登録を試せます！', 'success');
-    });
+      els.fetchModelsBtn.addEventListener('click', async () => {
+        const inputKey = els.apiKeyInput.value.trim();
+        if (inputKey && inputKey !== state.apiKey) {
+          state.apiKey = inputKey;
+          localStorage.setItem(STORAGE_KEYS.API_KEY, inputKey);
+          updateApiKeyUI();
+        }
+        if (!state.apiKey.trim()) {
+          showToast('先にAPIキーを入力してください');
+          return;
+        }
+        els.fetchModelsBtn.disabled = true;
+        els.fetchModelsBtn.textContent = '取得中...';
+        try {
+          const models = await discoverAvailableModels(true);
+          if (models.length > 0) {
+            renderAvailableModelsInSettings(models);
+            showToast(`${models.length}件の利用可能モデルを取得しました`);
+          } else {
+            showToast('モデル一覧を取得できませんでした（キーを確認してください）');
+          }
+        } finally {
+          els.fetchModelsBtn.disabled = false;
+          els.fetchModelsBtn.textContent = '一覧を取得';
+        }
+      });
 
-    /**************************************************************
-     * 初期化処理
-     **************************************************************/
-    loadCachedModels();
-    updateClockBanner();
-    setInterval(updateClockBanner, 30000);
-    updateApiKeyStatusUI();
-    renderEventCards();
-    if (getApiKey()) {
-      fetchAvailableModels(getApiKey(), true);
-    }
+      els.styleImageInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith('image/')).slice(0, 2);
+        if (files.length === 0) return;
+
+        state.styleImages = [];
+        for (const file of files) {
+          try {
+            const img = await loadFileToImage(file);
+            const processed = processImageOnCanvas(img, true, IMAGE_MAX_SIDE, IMAGE_JPEG_QUALITY);
+            state.styleImages.push({
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              processedDataUrl: processed.dataUrl,
+              base64: processed.base64,
+            });
+          } catch {
+            showToast('画像の読み込みに失敗しました');
+          }
+        }
+        e.target.value = '';
+        renderStyleImagePreviews();
+      });
+
+      els.analyzeStyleBtn.addEventListener('click', analyzeUserStyle);
+
+      els.useStyleProfileToggle.addEventListener('change', (e) => {
+        state.styleEnabled = e.target.checked;
+        localStorage.setItem(STORAGE_KEYS.STYLE_ENABLED, String(state.styleEnabled));
+        updateStyleQuickUI();
+      });
+
+      els.saveStyleBtn.addEventListener('click', () => {
+        const text = els.styleProfileTextarea.value.trim();
+        state.styleProfile = text;
+        if (text) {
+          localStorage.setItem(STORAGE_KEYS.STYLE_PROFILE, text);
+          if (!state.styleEnabled) {
+            state.styleEnabled = true;
+            localStorage.setItem(STORAGE_KEYS.STYLE_ENABLED, 'true');
+          }
+          showToast('文体プロファイルを保存しました');
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.STYLE_PROFILE);
+          state.styleEnabled = false;
+          localStorage.setItem(STORAGE_KEYS.STYLE_ENABLED, 'false');
+          showToast('文体プロファイルをクリアしました');
+        }
+        updateStyleQuickUI();
+      });
+
+      els.clearStyleBtn.addEventListener('click', () => {
+        els.styleProfileTextarea.value = '';
+        state.styleProfile = '';
+        state.styleEnabled = false;
+        state.styleImages = [];
+        localStorage.removeItem(STORAGE_KEYS.STYLE_PROFILE);
+        localStorage.setItem(STORAGE_KEYS.STYLE_ENABLED, 'false');
+        renderStyleImagePreviews();
+        updateStyleQuickUI();
+        showToast('文体プロファイルを消去しました');
+      });
+
+      els.closeLightboxBtn.addEventListener('click', () => els.lightboxModal.classList.add('hidden'));
+      els.lightboxModal.addEventListener('click', (e) => {
+        if (e.target === els.lightboxModal) els.lightboxModal.classList.add('hidden');
+      });
+
+      // ==========================================
+      // 初期化
+      // ==========================================
+      updateApiKeyUI();
+      updateStyleQuickUI();
+      renderChips();
+      updateBubbleModeUI();
+    })();
   </script>
 </body>
 </html>
